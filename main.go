@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"log"
 	"mqtt/config"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -91,59 +88,59 @@ func main() {
 	}
 
 	//inline client for subscription (callback func POSTs to Exchange cloud service):
-	subscribeCallback := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
-		deviceName := packet.TopicName[27:31]
-		MQTTPayload := string(packet.Payload)
-		incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
+	// subscribeCallback := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
+	// 	deviceName := packet.TopicName[27:31]
+	// 	MQTTPayload := string(packet.Payload)
+	// 	incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
 
-		if err != nil {
-			broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
-			return
-		}
+	// 	if err != nil {
+	// 		broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
+	// 		return
+	// 	}
 
-		watts := jsonquery.FindOne(incomingPayload, "energy").Value().(float64)
-		rssi := jsonquery.FindOne(incomingPayload, "rssi").Value().(float64)
+	// 	watts := jsonquery.FindOne(incomingPayload, "energy").Value().(float64)
+	// 	rssi := jsonquery.FindOne(incomingPayload, "rssi").Value().(float64)
 
-		broker.Log.Info("[sub:"+caller.ID+"]", "memberId", sub.Identifier, "deviceName", deviceName, "watts", watts, "rssi", rssi, "payload", MQTTPayload)
+	// 	broker.Log.Info("[sub:"+caller.ID+"]", "memberId", sub.Identifier, "deviceName", deviceName, "watts", watts, "rssi", rssi, "payload", MQTTPayload)
 
-		if cfg.CloudApi.CallsEnabled {
-			event := TelemetryEvent{
-				DeviceId:   sub.Identifier,
-				MemberId:   sub.Identifier,
-				DeviceName: deviceName,
-				Wattage:    watts,
-				Rssi:       rssi,
-			}
+	// 	if cfg.CloudApi.CallsEnabled {
+	// 		event := TelemetryEvent{
+	// 			DeviceId:   sub.Identifier,
+	// 			MemberId:   sub.Identifier,
+	// 			DeviceName: deviceName,
+	// 			Wattage:    watts,
+	// 			Rssi:       rssi,
+	// 		}
 
-			var arr []TelemetryEvent
-			arr = append(arr, event)
-			outgoingPayload, err := json.Marshal(arr)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
+	// 		var arr []TelemetryEvent
+	// 		arr = append(arr, event)
+	// 		outgoingPayload, err := json.Marshal(arr)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 			return
+	// 		}
 
-			telemetryResponse, err := http.Post(cfg.CloudApi.BaseUrl+cfg.CloudApi.Telemetry, "application/json", bytes.NewReader(outgoingPayload))
-			if err != nil {
-				broker.Log.Warn("Could not POST to Exchange Cloud Service")
-			}
-			defer telemetryResponse.Body.Close()
-			broker.Log.Info("POST successful.", "status code", telemetryResponse.StatusCode)
-		}
+	// 		telemetryResponse, err := http.Post(cfg.CloudApi.BaseUrl+cfg.CloudApi.Telemetry, "application/json", bytes.NewReader(outgoingPayload))
+	// 		if err != nil {
+	// 			broker.Log.Warn("Could not POST to Exchange Cloud Service")
+	// 		}
+	// 		defer telemetryResponse.Body.Close()
+	// 		broker.Log.Info("POST successful.", "status code", telemetryResponse.StatusCode)
+	// 	}
 
-		// cronStatusResponse, err := http.Get(cfg.CloudApi.BaseUrl + cfg.CloudApi.Cron)
-		// if err != nil {
-		// 	broker.Log.Warn("Could not GET Exchange order status")
-		// }
-		// defer cronStatusResponse.Body.Close()
-		// cron := CronSetup{}
-		// errDecode := json.NewDecoder(cronStatusResponse.Body).Decode(&cron)
-		// if errDecode != nil {
-		// 	broker.Log.Warn("error decoding cron data:", "error", errDecode)
-		// } else {
-		// 	broker.Log.Info("Latest Exchange order:", "data", cron)
-		// }
-	}
+	// 	// cronStatusResponse, err := http.Get(cfg.CloudApi.BaseUrl + cfg.CloudApi.Cron)
+	// 	// if err != nil {
+	// 	// 	broker.Log.Warn("Could not GET Exchange order status")
+	// 	// }
+	// 	// defer cronStatusResponse.Body.Close()
+	// 	// cron := CronSetup{}
+	// 	// errDecode := json.NewDecoder(cronStatusResponse.Body).Decode(&cron)
+	// 	// if errDecode != nil {
+	// 	// 	broker.Log.Warn("error decoding cron data:", "error", errDecode)
+	// 	// } else {
+	// 	// 	broker.Log.Info("Latest Exchange order:", "data", cron)
+	// 	// }
+	// }
 
 	subscribeCallbackSail := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
 		deviceName := packet.TopicName[27:31]
@@ -166,7 +163,7 @@ func main() {
 
 	}
 	//broker.Subscribe("switchbot/blower-ctrl/plug/heat/attributes", 3804, subscribeCallback)
-	broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallback)
+	//broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallback)
 	broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
 
 	//create a TCP Listener on a standard port:
