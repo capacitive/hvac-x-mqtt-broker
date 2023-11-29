@@ -1,0 +1,12 @@
+server:
+  host: "192.168.1.26"
+  port: 1883
+  controldevices: true
+
+cloudapi:
+  baseurl: "https://iot-rewards.ngrok.app/"
+  telemetry: "api/telemetry"
+  device: "api/device"
+  cron: "api/cron"
+  callsenabled: false
+  
