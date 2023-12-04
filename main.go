@@ -1,8 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"log"
-	"mqtt/config"
+	"mqtt-broker/config"
 	"os"
 	"os/signal"
 	"strings"
@@ -58,6 +59,89 @@ type FromTo struct {
 	MemberId string `json:"memberId"`
 }
 
+type ConnectionHandlerOptions struct {
+	Server *mqtt.Server
+}
+
+type ConnectionHandler struct {
+	mqtt.HookBase
+	config *ConnectionHandlerOptions
+}
+
+func (ch *ConnectionHandler) ID() string {
+	return "connection-handler"
+}
+
+func (ch *ConnectionHandler) Provides(b byte) bool {
+	return bytes.Contains([]byte{
+		mqtt.OnConnect,
+		mqtt.OnDisconnect,
+		mqtt.OnSubscribe,
+		mqtt.OnUnsubscribe,
+		mqtt.OnPublished,
+		mqtt.OnPublish,
+		mqtt.OnClientExpired,
+	}, []byte{b})
+}
+
+func (ch *ConnectionHandler) Init(config any) error {
+	ch.Log.Info("initialized")
+	if _, ok := config.(*ConnectionHandlerOptions); !ok && config != nil {
+		return mqtt.ErrInvalidConfigType
+	}
+
+	ch.config = config.(*ConnectionHandlerOptions)
+	if ch.config.Server == nil {
+		return mqtt.ErrInvalidConfigType
+	}
+	return nil
+}
+
+func (ch *ConnectionHandler) OnConnect(client *mqtt.Client, packet packets.Packet) error {
+	ch.Log.Info("client connected", "client", client.ID)
+	broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
+	return nil
+}
+
+func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire bool) {
+	if err != nil {
+		ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
+		client.Net.Conn.Close()
+		client.Stop(err)
+	} else {
+		ch.Log.Info("client disconnected", "client", client.ID, "expire", expire)
+		client.Stop(nil)
+	}
+}
+
+func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
+	ch.Log.Info("client expired", "client", client.ID)
+	client.Net.Conn.Close()
+	client.Stop(nil)
+}
+
+var broker *mqtt.Server
+
+var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
+	deviceName := packet.TopicName[27:31]
+	MQTTPayload := string(packet.Payload)
+	incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
+
+	if err != nil {
+		broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
+		return
+	}
+
+	toggled := jsonquery.FindOne(incomingPayload, "fan-sensor").Value().(string)
+
+	broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", MQTTPayload)
+	if toggled == "ON" {
+		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("ON"), false, 0)
+	} else {
+		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("OFF"), false, 0)
+	}
+}
+
 func main() {
 	//create signals channel to run server until interrupted
 	sigs := make(chan os.Signal, 1)
@@ -73,7 +157,7 @@ func main() {
 		create new MQTT broker
 		options: inline client enables server to pub/sub messages of its own
 	*/
-	broker := mqtt.New(&mqtt.Options{
+	broker = mqtt.New(&mqtt.Options{
 		InlineClient: true,
 	})
 
@@ -86,6 +170,57 @@ func main() {
 	} else {
 		broker.Log.Info("Extended config successfully loaded.", "baseUrl", cfg.CloudApi.BaseUrl)
 	}
+
+	//create a TCP Listener on a standard port:
+	tcp := listeners.NewTCP("mqtt-broker", ":1883", nil)
+	listenError := broker.AddListener(tcp)
+	if listenError != nil {
+		log.Fatal(listenError)
+	}
+
+	err = broker.AddHook(new(ConnectionHandler), &ConnectionHandlerOptions{
+		Server: broker,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// subscribeCallbackSail := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
+	// 	deviceName := packet.TopicName[27:31]
+	// 	MQTTPayload := string(packet.Payload)
+	// 	incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
+
+	// 	if err != nil {
+	// 		broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
+	// 		return
+	// 	}
+
+	// 	toggled := jsonquery.FindOne(incomingPayload, "fan-sensor").Value().(string)
+
+	// 	broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", MQTTPayload)
+	// 	if toggled == "ON" && cfg.Server.ControlDevices {
+	// 		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("ON"), false, 0)
+	// 	} else if cfg.Server.ControlDevices {
+	// 		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("OFF"), false, 0)
+	// 	}
+
+	// }
+	//broker.Subscribe("switchbot/blower-ctrl/plug/heat/attributes", 3804, subscribeCallback)
+	//broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallback)
+	//broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
+
+	go func() {
+		systemError := broker.Serve()
+		if systemError != nil {
+			log.Fatal(systemError)
+		}
+	}()
+
+	//run broker until interrupted:
+	<-done
+	broker.Log.Warn("Captured signal, stopping...")
+	_ = broker.Close()
+	broker.Log.Info("Broker main thread finished.")
 
 	//inline client for subscription (callback func POSTs to Exchange cloud service):
 	// subscribeCallback := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
@@ -141,52 +276,4 @@ func main() {
 	// 	// 	broker.Log.Info("Latest Exchange order:", "data", cron)
 	// 	// }
 	// }
-
-	subscribeCallbackSail := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
-		deviceName := packet.TopicName[27:31]
-		MQTTPayload := string(packet.Payload)
-		incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
-
-		if err != nil {
-			broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
-			return
-		}
-
-		toggled := jsonquery.FindOne(incomingPayload, "fan-sensor").Value().(string)
-
-		broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", MQTTPayload)
-		if toggled == "ON" && cfg.Server.ControlDevices {
-			broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("ON"), false, 0)
-		} else if cfg.Server.ControlDevices {
-			broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("OFF"), false, 0)
-		}
-
-	}
-	//broker.Subscribe("switchbot/blower-ctrl/plug/heat/attributes", 3804, subscribeCallback)
-	//broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallback)
-	broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
-
-	//create a TCP Listener on a standard port:
-	tcp := listeners.NewTCP("mqtt-broker", ":1883", nil)
-	listenError := broker.AddListener(tcp)
-	if listenError != nil {
-		log.Fatal(listenError)
-	}
-
-	go func() {
-		systemError := broker.Serve()
-		if systemError != nil {
-			log.Fatal(systemError)
-		}
-	}()
-
-	//run broker until interrupted:
-	<-done
-	broker.Log.Warn("Captured signal, stopping...")
-	_ = broker.Close()
-	broker.Log.Info("Broker main thread finished.")
-}
-
-type BroekerHook struct {
-	mqtt.HookBase
 }

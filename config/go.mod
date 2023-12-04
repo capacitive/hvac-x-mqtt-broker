@@ -1,4 +1,4 @@
-module mqtt/config
+module mqtt-broker/config
 
 go 1.21.3
 
