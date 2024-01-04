@@ -1,12 +1,13 @@
 server:
-  host: "192.168.1.26"
+  host: "192.168.50.86"
   port: 1883
-  controldevices: true
-
+  sendcommands: true
+devices:
+  plugs: ["hvac-f", "hvac-r"]
 cloudapi:
   baseurl: "https://iot-rewards.ngrok.app/"
   telemetry: "api/telemetry"
-  device: "api/device"
+  device: "api/device"ifcon
   cron: "api/cron"
   callsenabled: false
   
