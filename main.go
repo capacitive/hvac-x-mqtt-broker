@@ -107,6 +107,8 @@ func (ch *ConnectionHandler) OnConnect(client *mqtt.Client, packet packets.Packe
 }
 
 func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire bool) {
+	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
+
 	if err != nil {
 		ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
 		client.Net.Conn.Close()
@@ -119,6 +121,7 @@ func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire
 
 func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
 	ch.Log.Info("client expired", "client", client.ID)
+	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
 	client.Net.Conn.Close()
 	client.Stop(nil)
 }
@@ -150,8 +153,10 @@ var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, 
 		plugCommand := fmt.Sprintf("switchbot/blower-ctrl/plug/%s/set", plug)
 		if toggled == "ON" {
 			broker.Publish(plugCommand, []byte("ON"), false, 0)
+			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand+"ON", "BLE MAC", plug)
 		} else if toggled == "OFF" {
 			broker.Publish(plugCommand, []byte("OFF"), false, 0)
+			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand+"OFF", "BLE MAC", plug)
 		}
 	}
 }

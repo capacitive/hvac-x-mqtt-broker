@@ -7,7 +7,7 @@ devices:
 cloudapi:
   baseurl: "https://iot-rewards.ngrok.app/"
   telemetry: "api/telemetry"
-  device: "api/device"ifcon
+  device: "api/device"
   cron: "api/cron"
   callsenabled: false
   
