@@ -1,9 +1,14 @@
 server:
-  host: "192.168.50.86"
+  host: ""
   port: 1883
   sendcommands: true
 devices:
-  plugs: ["hvac-f", "hvac-r"]
+  plugs: 
+    idlist: [hvac-f, hvac-r]
+    command: "switchbot/blower-ctrl/plug/%s/set"
+  switches: 
+    idlist: []
+    command: "" 
 cloudapi:
   baseurl: "https://iot-rewards.ngrok.app/"
   telemetry: "api/telemetry"

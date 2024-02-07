@@ -6,6 +6,7 @@ import (
 	"log"
 	"mqtt-broker/config"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -17,48 +18,9 @@ import (
 	"github.com/mochi-mqtt/server/v2/packets"
 )
 
-type TelemetryEvent struct {
-	MemberId   int     `json:"memberId"`
-	DeviceId   int     `json:"deviceId"`
-	DeviceName string  `json:"deviceName"`
-	Wattage    float64 `json:"wattage"`
-	Rssi       float64 `json:"rssi"`
-}
+var broker *mqtt.Server
 
-type DeviceRegistration struct {
-	Name       string `json:"deviceName"`
-	MemberId   int    `json:"memberId"`
-	DeviceId   int    `json:"deviceId"`
-	MacAddress string `json:"macAddress"`
-}
-
-type CronSetup struct {
-	ThresholdLT  float32  `json:"thresholdLT"`
-	Enabled      bool     `json:"enabled"`
-	LastExchange Exchange `json:"lastExchange"`
-}
-
-type Exchange struct {
-	Type               string `json:"type"`
-	WpId               string `json:"wpId"`
-	UserId             string `json:"userId"`
-	ConfirmationEmail  string `json:"confirmationEmail"`
-	ConfirmationNumber string `json:"confirmationNumber"`
-	CreatedAt          string `json:"createdAt"`
-	ExpiresAt          string `json:"expiresAt"`
-	OrderLink          string `json:"orderLink"`
-	OrderId            string `json:"orderId"`
-	Status             string `json:"status"`
-	UpdatedAt          string `json:"updatedAt"`
-	To                 FromTo `json:"to"`
-	From               FromTo `json:"from"`
-}
-
-type FromTo struct {
-	Amount   int    `json:"amount"`
-	LpId     string `json:"lpId"`
-	MemberId string `json:"memberId"`
-}
+const blowerCtrlClientID = "blower-ctrl"
 
 type ConnectionHandlerOptions struct {
 	Server *mqtt.Server
@@ -101,33 +63,39 @@ func (ch *ConnectionHandler) Init(config any) error {
 func (ch *ConnectionHandler) OnConnect(client *mqtt.Client, packet packets.Packet) error {
 	ch.Log.Info("client connected", "client", client.ID)
 	broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
-	//broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallbackInlineFan)
-	//broker.Subscribe("switchbot/blower-ctrl/plug/test/attributes", 3804, subscribeCallbackInlineFan)
+
+	if client.ID == blowerCtrlClientID {
+		broker.Publish("starcaf/contrl/sensor/hvac/blower-ctrl/state", []byte("CONNECTED"), false, 0)
+	}
+
 	return nil
 }
 
 func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire bool) {
+	ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
-
-	if err != nil {
-		ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
-		client.Net.Conn.Close()
-		client.Stop(err)
-	} else {
-		ch.Log.Info("client disconnected", "client", client.ID, "expire", expire)
-		client.Stop(nil)
-	}
+	client.Stop(err)
+	//client.Net.Conn.Close()
 }
 
 func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
-	ch.Log.Info("client expired", "client", client.ID)
+	ch.Log.Info("client expired", "client", client.ID, "IP", client.Net.Conn.LocalAddr())
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
-	client.Net.Conn.Close()
 	client.Stop(nil)
+	rebootRestartBroker()
+	//client.Net.Conn.Close()
 }
 
-var broker *mqtt.Server
-var cfg config.Config
+func rebootRestartBroker() {
+	cmd := exec.Command("sudo", "reboot")
+	//cmd.Stdout = os.Stdout
+	//cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(string(out))
+}
 
 var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
 	deviceName := packet.TopicName[27:33]
@@ -143,36 +111,20 @@ var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, 
 
 	broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", MQTTPayload)
 
-	// if toggled == "ON" {
-	// 	broker.Publish("switchbot/blower-ctrl/plug/hvac-f/set", []byte("ON"), false, 0)
-	// } else {
-	// 	broker.Publish("switchbot/blower-ctrl/plug/hvac-f/set", []byte("OFF"), false, 0)
-	// }
+	cfg, _ := config.LoadConfig()
+	broker.Log.Info("Devices in config", "plugs", cfg.Devices.Plugs)
 
-	for _, plug := range cfg.Devices.Plugs {
-		plugCommand := fmt.Sprintf("switchbot/blower-ctrl/plug/%s/set", plug)
+	for _, plug := range cfg.Devices.Plugs.IDList {
+		plugCommand := fmt.Sprintf(cfg.Devices.Plugs.Command, plug)
 		if toggled == "ON" {
 			broker.Publish(plugCommand, []byte("ON"), false, 0)
-			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand+"ON", "BLE MAC", plug)
+			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand, "Payload", "ON")
 		} else if toggled == "OFF" {
 			broker.Publish(plugCommand, []byte("OFF"), false, 0)
-			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand+"OFF", "BLE MAC", plug)
+			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand, "Payload", "OFF")
 		}
 	}
 }
-
-// var subscribeCallbackInlineFan = func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
-// 	deviceName := packet.TopicName[27:31]
-// 	MQTTPayload := string(packet.Payload)
-// 	incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
-
-// 	if err != nil {
-// 		broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
-// 		return
-// 	}
-
-// 	broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", incomingPayload)
-// }
 
 func main() {
 	//create signals channel to run server until interrupted
@@ -190,9 +142,6 @@ func main() {
 		options: inline client enables server to pub/sub messages of its own
 	*/
 	broker = mqtt.New(&mqtt.Options{
-		// Capabilities: &mqtt.Capabilities{
-		// 	MaximumSessionExpiryInterval: 1000,
-		// },
 		InlineClient: true,
 	})
 
@@ -203,7 +152,17 @@ func main() {
 		broker.Log.Info("Error loading broker's extended config")
 		log.Fatal(err)
 	} else {
-		broker.Log.Info("Extended config successfully loaded.", "baseUrl", cfg.CloudApi.BaseUrl)
+		broker.Log.Info("Extended config successfully loaded.", "Devices", cfg.Devices.Plugs.IDList)
+
+		for _, plug := range cfg.Devices.Plugs.IDList {
+			plugCommand := fmt.Sprintf(cfg.Devices.Plugs.Command, plug)
+			broker.Log.Info("[PUBLISH] pre-command TEST", "Command", plugCommand)
+		}
+
+		for _, plug := range cfg.Devices.Switches.IDList {
+			plugCommand := fmt.Sprintf(cfg.Devices.Switches.Command, plug)
+			broker.Log.Info("[PUBLISH] pre-command TEST", "Command", plugCommand)
+		}
 	}
 
 	//create a TCP Listener on a standard port:
@@ -219,30 +178,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// subscribeCallbackSail := func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
-	// 	deviceName := packet.TopicName[27:31]
-	// 	MQTTPayload := string(packet.Payload)
-	// 	incomingPayload, err := jsonquery.Parse(strings.NewReader(MQTTPayload))
-
-	// 	if err != nil {
-	// 		broker.Log.Warn("jsonquery.Parse FAIL", "error", err)
-	// 		return
-	// 	}
-
-	// 	toggled := jsonquery.FindOne(incomingPayload, "fan-sensor").Value().(string)
-
-	// 	broker.Log.Info("[sub:"+caller.ID+"]", "id", sub.Identifier, "deviceName", deviceName, "payload", MQTTPayload)
-	// 	if toggled == "ON" && cfg.Server.ControlDevices {
-	// 		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("ON"), false, 0)
-	// 	} else if cfg.Server.ControlDevices {
-	// 		broker.Publish("switchbot/blower-ctrl/plug/heat/set", []byte("OFF"), false, 0)
-	// 	}
-
-	// }
-	//broker.Subscribe("switchbot/blower-ctrl/plug/heat/attributes", 3804, subscribeCallback)
-	//broker.Subscribe("switchbot/blower-ctrl/plug/hvac/attributes", 3804, subscribeCallback)
-	//broker.Subscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909, subscribeCallbackSail)
 
 	go func() {
 		systemError := broker.Serve()

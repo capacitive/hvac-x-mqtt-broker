@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
@@ -13,7 +15,14 @@ type Config struct {
 		SendCommands bool   `yaml:"sendcommands"`
 	} `yaml:"server"`
 	Devices struct {
-		Plugs []string `yaml:"plugs,flow"`
+		Plugs struct {
+			IDList  []string `yaml:"idlist,flow"`
+			Command string   `yaml:"command"`
+		} `yaml:"plugs"`
+		Switches struct {
+			IDList  []string `yaml:"idlist,flow"`
+			Command string   `yaml:"command"`
+		} `yaml:"switches"`
 	} `yaml:"devices"`
 	CloudApi struct {
 		BaseUrl      string `yaml:"baseurl"`
@@ -25,7 +34,11 @@ type Config struct {
 }
 
 func LoadConfig() (cfg Config, err error) {
-	file, err := os.Open("./broker-config.yml")
+	exe, err := os.Executable()
+	exePath := filepath.Dir(exe)
+	fmt.Println("config file loaded from path:", exePath)
+
+	file, err := os.Open(exePath + "/broker-config.yml")
 	if err != nil {
 		return Config{}, err
 	}
