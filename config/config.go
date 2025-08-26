@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
+
 )
 
 type Config struct {
@@ -34,6 +35,8 @@ type Config struct {
 }
 
 func LoadConfig() (cfg Config, err error) {
+	
+
 	exe, err := os.Executable()
 	exePath := filepath.Dir(exe)
 	fmt.Println("config file loaded from path:", exePath)

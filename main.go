@@ -75,7 +75,8 @@ func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire
 	ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
 	client.Stop(err)
-	//client.Net.Conn.Close()
+	rebootRestartBroker()
+	client.Net.Conn.Close()
 }
 
 func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
@@ -83,7 +84,7 @@ func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
 	client.Stop(nil)
 	rebootRestartBroker()
-	//client.Net.Conn.Close()
+	client.Net.Conn.Close()
 }
 
 func rebootRestartBroker() {
