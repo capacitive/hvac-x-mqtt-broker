@@ -1,3 +1,8 @@
+## Amazon Q
+
+### Standalone Go Modules (execution independence)
+I'm trying to figure out how to create a utility Go project in a subfolder of this main project. The problem is that any subfolder based app requires the mod.go to contain its dependcencies. Is there a way to create completely isolated Go apps in subfolders that don't affect the main project Go app in any way? Please research related Go documentation on the web, and learn how to do this, if you're able to get access to the www.
+
 ### Test App (mini service)
 
 I would like you to create a small test app that emulates a sail-sensor's behaviour.
