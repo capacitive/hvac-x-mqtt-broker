@@ -1,0 +1,7 @@
+### Minimal Image Deployment & Subsequent OTA Deployment
+1. Make sure the OTA deploy system is congruent with the minimal OS image configuration - I can see that the setup-pi.sh script may be overlapping some of the items already completed in the create-complete-image.sh script. The goal is to use the min OS image script to make the image, then use the flash-usb.sh script to flash it onto the SD drive for the RPI Zero, then use the OTA deployment command in the makefile to continuously deploy to the RPI Zero.
+2. Make both the OTA and min image scripts available via makefile commands.  The OTA may not need the pi setup, since the flashed image already has things like the /opt/hvac-mqtt directory.  Make sure to include all the things required for the mqtt-broker app to run at device startup.
+
+### Logging
+1. All log output of the mqtt-broker is required to stream to the shell prompt of the minimal linux OS running on the RPI Zero, for all users. Tail the last 20 outputs - only those need be printed on the screen at one time.
+2. All log output is required to be streamed to a web socket for remote monitoring and debugging.  Also provide a gRPC endpoint for remote log output monitoring and debugging.
