@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"mqtt-broker/config"
+	"mqtt-broker/logger"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -178,6 +179,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Start log streaming services
+	logger.StartLogServices()
 
 	go func() {
 		systemError := broker.Serve()

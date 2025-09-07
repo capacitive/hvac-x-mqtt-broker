@@ -75,9 +75,12 @@ mount -t devtmpfs devtmpfs /dev
 # Enable SSH for OTA updates
 /usr/sbin/sshd -D &
 
-# Start MQTT broker
+# Start MQTT broker with log streaming
 cd /opt/hvac-mqtt
-./mqtt-broker &
+./mqtt-broker 2>&1 | tee /tmp/mqtt-logs | tail -n 20 &
+
+# Display logs on console
+tail -n 20 -f /tmp/mqtt-logs &
 
 # Keep system running
 while true; do sleep 3600; done
