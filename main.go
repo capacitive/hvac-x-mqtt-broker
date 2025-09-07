@@ -7,10 +7,10 @@ import (
 	"mqtt-broker/config"
 	"mqtt-broker/logger"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/antchfx/jsonquery"
 	mqtt "github.com/mochi-mqtt/server/v2"
@@ -75,28 +75,40 @@ func (ch *ConnectionHandler) OnConnect(client *mqtt.Client, packet packets.Packe
 func (ch *ConnectionHandler) OnDisconnect(client *mqtt.Client, err error, expire bool) {
 	ch.Log.Info("client disconnected", "client", client.ID, "IP", client.Net.Conn.LocalAddr(), "expire", expire, "error", err)
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
+	
+	// Graceful connection cleanup with timeout
+	if client.Net.Conn != nil {
+		client.Net.Conn.SetDeadline(time.Now().Add(5 * time.Second))
+		client.Net.Conn.Close()
+	}
+	
 	client.Stop(err)
-	//client.Net.Conn.Close()
 }
 
 func (ch *ConnectionHandler) OnClientExpired(client *mqtt.Client) {
 	ch.Log.Info("client expired", "client", client.ID, "IP", client.Net.Conn.LocalAddr())
 	broker.Unsubscribe("starcaf/contrl/sensor/hvac/sail/attributes", 2909)
+	
+	// Graceful connection cleanup with timeout
+	if client.Net.Conn != nil {
+		client.Net.Conn.SetDeadline(time.Now().Add(5 * time.Second))
+		client.Net.Conn.Close()
+	}
+	
 	client.Stop(nil)
-	rebootRestartBroker()
-	//client.Net.Conn.Close()
+	ch.Log.Warn("Client expired, cleaned up resources", "client", client.ID)
 }
 
-func rebootRestartBroker() {
-	cmd := exec.Command("sudo", "reboot")
-	//cmd.Stdout = os.Stdout
-	//cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(string(out))
-}
+// func rebootRestartBroker() {
+// 	cmd := exec.Command("sudo", "reboot")
+// 	//cmd.Stdout = os.Stdout
+// 	//cmd.Stderr = os.Stderr
+// 	out, err := cmd.Output()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// 	fmt.Println(string(out))
+// }
 
 var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, packet packets.Packet) {
 	deviceName := packet.TopicName[27:33]
@@ -117,10 +129,11 @@ var subscribeCallbackSail = func(caller *mqtt.Client, sub packets.Subscription, 
 
 	for _, plug := range cfg.Devices.Plugs.IDList {
 		plugCommand := fmt.Sprintf(cfg.Devices.Plugs.Command, plug)
-		if toggled == "ON" {
+		switch toggled {
+		case "ON":
 			broker.Publish(plugCommand, []byte("ON"), false, 0)
 			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand, "Payload", "ON")
-		} else if toggled == "OFF" {
+		case "OFF":
 			broker.Publish(plugCommand, []byte("OFF"), false, 0)
 			broker.Log.Info("[PUBLISH] command sent", "Command", plugCommand, "Payload", "OFF")
 		}
