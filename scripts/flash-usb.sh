@@ -81,26 +81,45 @@ if [ ${#USB_DEVICES[@]} -eq 0 ]; then
     echo "Enter device manually:"
     read -p "Device path (e.g., /dev/sdb): " USB_DEVICE
 else
-    echo "Found USB devices:"
-    for i in "${!USB_DEVICES[@]}"; do
-        IFS=':' read -r dev model size <<< "${USB_DEVICES[$i]}"
-        echo "$((i+1))) $model ${size} (/dev/$dev)"
+    while true; do
+        echo "Found USB devices:"
+        for i in "${!USB_DEVICES[@]}"; do
+            IFS=':' read -r dev model size <<< "${USB_DEVICES[$i]}"
+            echo "$((i+1))) $model ${size} (/dev/$dev)"
+        done
+        echo "$((${#USB_DEVICES[@]}+1))) Manual entry"
+        echo "r) Rescan devices"
+        
+        read -p "Select device [1-$((${#USB_DEVICES[@]}+1))], 'r' to rescan: " choice
+        
+        if [[ $choice == "r" ]]; then
+            echo "Rescanning..."
+            scan_devices
+            continue
+        elif [[ $choice -ge 1 && $choice -le ${#USB_DEVICES[@]} ]]; then
+            IFS=':' read -r dev model size <<< "${USB_DEVICES[$((choice-1))]}"
+            USB_DEVICE="/dev/$dev"
+            DEVICE_INFO="$model $size"
+            
+            echo "Selected: $DEVICE_INFO"
+            read -p "Confirm selection? [y/N/r=reselect]: " confirm
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                break
+            elif [[ $confirm == "r" ]]; then
+                continue
+            else
+                echo "Selection cancelled. Choose again."
+                continue
+            fi
+        elif [[ $choice -eq $((${#USB_DEVICES[@]}+1)) ]]; then
+            read -p "Device path (e.g., /dev/sdb): " USB_DEVICE
+            DEVICE_INFO="$USB_DEVICE"
+            break
+        else
+            echo "Invalid selection. Try again."
+            continue
+        fi
     done
-    echo "$((${#USB_DEVICES[@]}+1))) Manual entry"
-    
-    read -p "Select device [1-$((${#USB_DEVICES[@]}+1))]: " choice
-    
-    if [[ $choice -ge 1 && $choice -le ${#USB_DEVICES[@]} ]]; then
-        IFS=':' read -r dev model size <<< "${USB_DEVICES[$((choice-1))]}"
-        USB_DEVICE="/dev/$dev"
-        DEVICE_INFO="$model $size"
-    elif [[ $choice -eq $((${#USB_DEVICES[@]}+1)) ]]; then
-        read -p "Device path (e.g., /dev/sdb): " USB_DEVICE
-        DEVICE_INFO="$USB_DEVICE"
-    else
-        echo "Invalid selection. Exiting."
-        exit 1
-    fi
 fi
 
 echo
@@ -112,7 +131,11 @@ echo
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Flashing to $USB_DEVICE..."
-    dd if=pi-hvac.img of=$USB_DEVICE bs=4M status=progress
+    if ! command -v pv >/dev/null 2>&1; then
+        echo "Installing pv for progress display..."
+        apt-get update -qq && apt-get install -y pv >/dev/null 2>&1
+    fi
+    pv pi-hvac.img | dd of=$USB_DEVICE bs=4M
     echo "Syncing data to disk..."
     sync
     echo "Ejecting device..."

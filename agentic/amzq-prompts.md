@@ -26,4 +26,35 @@ Acting as an engaging yet professional embedded technology instructor (in the st
 
 ---------------------------------------
 
+### RPI Zero bootup testing results
+The green activity light is flashing intermittently, but I see no video output from the device, to which I've connected a mini HDMI cable and a monitor. I also have connected a USB header to the Zero, to which I've attached a keyboard and mouse. The keyboard has LEDs which do not light up when the Zero is booted. Something isn't bootstrapping properly on the Zero device.
 
+---------------------------------------
+
+### RPI Zero bootup testing results 2
+Same as the previous two attempts - no change to the situation.
+
+Why don't you just use a recognized, tested and available minimal RPI Zero Linux distro for the image's OS? Keep in mind this device we're creating an image for is a RPI Zero W (wireless and bluetooth).
+
+---------------------------------------
+
+The setup of the mqtt server is not present or being respected on the RPI OS:
+1. the OS needs to start up without requiring a user login (it's a real server)
+2. the mqtt server needs to start up automatically.
+3. the country and Wifi configuration needs to be set up automatically (derive wifi config for network name/password from the mqtt config)
+
+Is it possible (and are *you* able) to make customization changes to a standard RPI OS Lite image/distribution and strip out any features/programs that the mqtt server doesn't need (retaining keyboard, and HDMI support)?
+
+---------------------------------------
+
+This output line from the create image script:
+
+Note: Edit /boot/wpa_supplicant.conf with your WiFi credentials
+
+Please create an interaction that allows me to enter the wifi credentials that will be used for the image creation. This speeds up the image deployment process.
+
+---------------------------------------
+
+the setup wizard is still in place, and the resulting configuration does NOT include static IP address 192.168.1.23, as far as I can see from the last bootup sequence of the device. Please ensure that the wizard is disabled, and the configuration is completed for the OS image as expected.
+
+---------------------------------------
