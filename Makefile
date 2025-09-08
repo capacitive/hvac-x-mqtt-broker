@@ -11,10 +11,10 @@ deploy: build
 	./scripts/ota-deploy.sh
 
 image:
-	sudo ./scripts/create-complete-image.sh
+	sudo ./scripts/create-image.sh
 
 flash:
 	sudo ./scripts/flash-usb.sh
 
 clean:
-	rm -f $(APP_NAME) pi-hvac-complete.img
+	rm -f $(APP_NAME) pi-hvac.img

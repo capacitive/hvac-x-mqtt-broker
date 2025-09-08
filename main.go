@@ -6,6 +6,7 @@ import (
 	"log"
 	"mqtt-broker/config"
 	"mqtt-broker/logger"
+	"mqtt-broker/updater"
 	"os"
 	"os/signal"
 	"strings"
@@ -195,6 +196,9 @@ func main() {
 
 	// Start log streaming services
 	logger.StartLogServices()
+
+	// Start HTTP update server
+	updater.StartUpdateServer()
 
 	go func() {
 		systemError := broker.Serve()

@@ -10,7 +10,7 @@
 
 ### Create Bootable Image
 ```bash
-# Creates pi-hvac-complete.img (512MB)
+# Creates pi-hvac.img (512MB)
 make image
 ```
 
@@ -37,6 +37,6 @@ make deploy
 ## Files
 
 - `scripts/ota-deploy.sh` - OTA deployment
-- `scripts/create-complete-image.sh` - Complete OS image creation
+- `scripts/create-image.sh` - OS image creation
 - `scripts/flash-usb.sh` - SD card flashing
 - `Makefile` - Build commands

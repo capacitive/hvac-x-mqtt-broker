@@ -8,6 +8,7 @@ require (
 	github.com/mochi-mqtt/server/v2 v2.4.1
 	mqtt-broker/config v1.0.0
 	mqtt-broker/logger v1.0.0
+	mqtt-broker/updater v1.0.0
 	google.golang.org/grpc v1.58.3
 )
 
@@ -23,4 +24,5 @@ require (
 replace (
 	mqtt-broker/config v1.0.0 => ./config
 	mqtt-broker/logger v1.0.0 => ./logger
+	mqtt-broker/updater v1.0.0 => ./updater
 )
