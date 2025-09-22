@@ -1,1 +1,13 @@
 mqtt-broker
+
+# Build artifacts
+build/
+pi-hvac.img
+.cache/
+raspios-*.xz
+*.tar.gz
+
+# OS/editor
+.DS_Store
+*.swp
+

@@ -12,3 +12,23 @@ The application in this repo acts as an event server/broker and has a ./broker-c
 
 ### Test App (GUI)
  Give the test app mini service app a front-end that allows for live-toggling of modes and manual state changes. Use svelte or react/electron, or any other framework that allows for a zero dependency or self-contained build that can be served from an embedded device or any machine that can serve web pages. Assume the service will be running on a local device with an ARM architecture.
+
+ ## OTA/local sd card deloyment for RPI Zero
+ Set up this application for OTA (Over the Air) build deployment. I'm currently running the app on a Raspberry Pi Zero running a Debian OS. The IP address of the Pi needs to be 192.168.1.23, the app server is to listen on port 1883 (make both these configurable).
+
+Also set up this application for direct deployment of a small footprint Linux OS image (with this app pre-installed) to a mounted USB drive. This freshly created OS image will meet all the requirements for running on a Raspberry Pi Zero. This app will need to run at startup on the Pi.
+
+**1. Hardware Abstraction (Bootloader)**
+- `bootcode.bin` - Pi's GPU bootloader
+- `start.elf` - Loads the kernel
+
+**2. Kernel Layer**
+- `kernel.img` - The actual Linux kernel compiled for ARM
+- Provides syscalls, device drivers, memory management
+- This is what makes it "Linux"
+
+**3. Userspace (Your Application)**
+- This app's Go binary + minimal shell/utilities
+- Runs on top of kernel via syscalls
+
+Attempt a custom linux image build, but provide options for using a recognized, tested and available minimal RPI Zero Linux distro for the image's OS.  Keep in mind this device we're creating an image for is a RPI Zero W (wireless and bluetooth).
