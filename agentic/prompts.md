@@ -13,10 +13,10 @@ The application in this repo acts as an event server/broker and has a ./broker-c
 ### Test App (GUI)
  Give the test app mini service app a front-end that allows for live-toggling of modes and manual state changes. Use svelte or react/electron, or any other framework that allows for a zero dependency or self-contained build that can be served from an embedded device or any machine that can serve web pages. Assume the service will be running on a local device with an ARM architecture.
 
- ## OTA/local sd card deloyment for RPI Zero
- Set up this application for OTA (Over the Air) build deployment. I'm currently running the app on a Raspberry Pi Zero running a Debian OS. The IP address of the Pi needs to be 192.168.1.23, the app server is to listen on port 1883 (make both these configurable).
+ ## Local SD card and subsequent OTA deloyment for RPI Zero W
+ Set up this application for direct deployment of a small footprint Linux OS image (with this app pre-installed) to a mounted USB drive (a micro SD card adapter or directly inserted micro sd card). This freshly created OS image will meet all the requirements for running on a Raspberry Pi Zero W. This app will need to run at startup on the Pi. The IP address of the Pi needs to be 192.168.1.23, and the app server is to listen on port 1883 (make both these configurable pre-build).
 
-Also set up this application for direct deployment of a small footprint Linux OS image (with this app pre-installed) to a mounted USB drive. This freshly created OS image will meet all the requirements for running on a Raspberry Pi Zero. This app will need to run at startup on the Pi.
+ Once this is accomplished, set up this application for OTA (Over the Air) build deployment with versioning. 
 
 **1. Hardware Abstraction (Bootloader)**
 - `bootcode.bin` - Pi's GPU bootloader
