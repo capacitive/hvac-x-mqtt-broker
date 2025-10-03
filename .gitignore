@@ -2,7 +2,7 @@ mqtt-broker
 
 # Build artifacts
 build/
-pi-hvac.img
+*.img
 .cache/
 raspios-*.xz
 *.tar.gz

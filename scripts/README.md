@@ -43,6 +43,10 @@ make image STATIC_IP=192.168.1.23 MQTT_PORT=1883 HOSTNAME=${HOSTNAME} VERSION=1.
 sudo make flash DEVICE=/dev/sdX
 ```
 
+
+### About sudo --preserve-env
+- When creating the image, the Makefile runs the script under sudo and uses `--preserve-env` to keep selected variables (e.g., `APP_NAME`, `STATIC_IP`, `MQTT_PORT`, etc.) in the root environment. Without this, those settings would be lost when the shell elevates, and the image build would not pick up your Makefile overrides.
+
 Systemd service used for auto-start (excerpt):<br/>
 **create-image.sh** (scripts/create-image.sh)
 ```bash
@@ -155,6 +159,32 @@ file, err := os.Open(filepath.Dir(exe) + "/broker-config.yml")
 - Raspberry Pi OS “Lite (Legacy)” may be needed for Zero W; you can override IMAGE_URL in make image
 - Security: You can upgrade integrity to signed artifacts (GPG) if desired; I can add that if you want
 - Do you want Wi-Fi credentials baked into /boot/wpa_supplicant.conf by default, or prefer manual provisioning?
+
+
+---
+
+### Glossary of variables (Makefile and scripts)
+- APP_NAME: hvacx-broker — App binary/service/dir name; used for /opt/${APP_NAME}, ${APP_NAME}.service, ${APP_NAME}.img
+- BUILD_DIR: build — Local build output directory; contains the prebuilt ARMv6 binary and release artifacts
+- OUTPUT_IMG: ${APP_NAME}.img — Image filename that flash.sh writes to the SD card
+- STATIC_IP: 192.168.1.23 — Baked into dhcpcd.conf for wlan0 on the image
+- MQTT_PORT: 1883 — Injected into broker-config.yml on the image and used for deploy health check
+- ROUTER_IP: 192.168.1.1 — Default gateway for wlan0 in dhcpcd.conf
+- DNS: "1.1.1.1 8.8.8.8" — DNS servers in dhcpcd.conf
+- HOSTNAME: hvacx-broker — Set in /etc/hostname and /etc/hosts on the image
+- WIFI_SSID: mywifi — Optional; generates wpa_supplicant.conf on /boot for first boot
+- WIFI_PSK: secretpass — Optional; Wi-Fi PSK placed with SSID in wpa_supplicant.conf
+- IMAGE_URL: https://downloads.raspberrypi.com/raspios_lite_armhf_latest — Source URL for Raspberry Pi OS Lite (override for legacy)
+- PI_HOST: 192.168.1.23 — Target Pi hostname/IP for OTA deploy/rollback
+- PI_USER: root — SSH user for OTA operations
+- VERSION: 20251003-121530 — Release identifier used as releases/<VERSION> and package naming
+- PORT: 1883 — TCP port used in deploy health check (nc) against the target
+- SSH_OPTS: -o StrictHostKeyChecking=no — Extra SSH/SCP options during OTA
+- APP_DIR: /opt/${APP_NAME} — Install base on the Pi; contains releases/, current, previous
+- SERVICE_NAME: ${APP_NAME}.service — systemd unit name managed during deploy/rollback
+- LOG_FILE: /var/log/${APP_NAME}.log — Fallback log file when not using systemd on the Pi
+- DEVICE: /dev/sdX — Block device for flashing the image (used by make flash)
+- DEPLOY_NEEDS_SUDO: 0 — If 1, make deploy/rollback will prompt for sudo (host-side)
 
 ### Would you like me to:
 - Add GPG signing and verification for OTA packages?

@@ -35,12 +35,12 @@ if [[ -z "$VERSION" ]]; then
   if [[ -f "$VERSION_FILE" ]]; then VERSION="$(cat "$VERSION_FILE")"; else VERSION="0.1.0"; fi
 fi
 
-# Build Go binary for ARMv6 (Pi Zero W)
-GO_BIN="${GO_BIN:-go}"
-echo "Building $APP_NAME for ARMv6 (GOARM=6)..."
-mkdir -p "$BUILD_DIR"
-( cd "$PROJECT_DIR" && \
-  CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 "$GO_BIN" build -o "$BUILD_DIR/$APP_NAME" ./ )
+# Use prebuilt ARMv6 binary (built by Makefile's build-arm). Avoid building under sudo.
+BIN_PATH="$BUILD_DIR/$APP_NAME"
+if [[ ! -x "$BIN_PATH" ]]; then
+  echo "Error: $BIN_PATH not found. Run 'make build-arm' before 'make image'." >&2
+  exit 1
+fi
 cp -f "$PROJECT_DIR/broker-config.yml" "$BUILD_DIR/broker-config.yml"
 
 # Fetch Raspberry Pi OS Lite image (cached)
