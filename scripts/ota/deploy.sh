@@ -20,23 +20,30 @@ SSH_OPTS=${SSH_OPTS:-"-o StrictHostKeyChecking=no"}
 VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 PORT="${PORT:-1883}"
 
+# App naming (overridable via env or Makefile)
+APP_NAME="${APP_NAME:-mqtt-broker}"
+APP_DIR="${APP_DIR:-/opt/$APP_NAME}"
+SERVICE_NAME="${SERVICE_NAME:-$APP_NAME.service}"
+LOG_FILE="${LOG_FILE:-/var/log/$APP_NAME.log}"
+
+
 # Build ARMv6 binary
 mkdir -p "$BUILD_DIR"
 echo "Building ARMv6 binary for OTA..."
-( cd "$PROJECT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -o "$BUILD_DIR/mqtt-broker" ./ )
+( cd "$PROJECT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -o "$BUILD_DIR/$APP_NAME" ./ )
 cp -f "$PROJECT_DIR/broker-config.yml" "$BUILD_DIR/broker-config.yml"
 
 # Package release
 REL_DIR="$BUILD_DIR/release-$VERSION"
-PKG="$BUILD_DIR/mqtt-broker-$VERSION.tar.gz"
+PKG="$BUILD_DIR/$APP_NAME-$VERSION.tar.gz"
 rm -rf "$REL_DIR"
 mkdir -p "$REL_DIR"
-cp "$BUILD_DIR/mqtt-broker" "$REL_DIR/"
+cp "$BUILD_DIR/$APP_NAME" "$REL_DIR/"
 cp "$BUILD_DIR/broker-config.yml" "$REL_DIR/"
-( cd "$REL_DIR" && sha256sum mqtt-broker broker-config.yml > SHA256SUMS )
+( cd "$REL_DIR" && sha256sum "$APP_NAME" broker-config.yml > SHA256SUMS )
 ( cd "$BUILD_DIR" && tar -czf "$PKG" "release-$VERSION" )
 
-REMOTE_BASE="/opt/hvac-mqtt"
+REMOTE_BASE="$APP_DIR"
 REMOTE_REL="$REMOTE_BASE/releases/$VERSION"
 
 # Upload and install atomically
@@ -69,11 +76,11 @@ ln -snf "$REMOTE_REL" "$REMOTE_BASE/current"
 # Restart service
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
-  systemctl restart hvac-mqtt.service
+  systemctl restart "$SERVICE_NAME"
 else
   # Fallback: try killing existing process (very minimal systems)
-  pkill -f "/opt/hvac-mqtt/current/mqtt-broker" || true
-  nohup /opt/hvac-mqtt/current/mqtt-broker >/var/log/hvac-mqtt.log 2>&1 &
+  pkill -f "$APP_DIR/current/$APP_NAME" || true
+  nohup "$APP_DIR/current/$APP_NAME" >"$LOG_FILE" 2>&1 &
 fi
 EOF
 

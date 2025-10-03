@@ -27,6 +27,8 @@ IMAGE_URL="${IMAGE_URL:-https://downloads.raspberrypi.com/raspios_lite_armhf_lat
 OUTPUT_IMG="$PROJECT_DIR/pi-hvac.img"
 VERSION_FILE="$PROJECT_DIR/VERSION"
 VERSION="${VERSION:-}"
+# App naming (shared for binary name, directory under /opt, and service name)
+APP_NAME="${APP_NAME:-mqtt-broker}"
 
 if [[ -z "$VERSION" ]]; then
   if [[ -f "$VERSION_FILE" ]]; then VERSION="$(cat "$VERSION_FILE")"; else VERSION="0.1.0"; fi
@@ -34,10 +36,10 @@ fi
 
 # Build Go binary for ARMv6 (Pi Zero W)
 GO_BIN="${GO_BIN:-go}"
-echo "Building mqtt-broker for ARMv6 (GOARM=6)..."
+echo "Building $APP_NAME for ARMv6 (GOARM=6)..."
 mkdir -p "$BUILD_DIR"
 ( cd "$PROJECT_DIR" && \
-  CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 "$GO_BIN" build -o "$BUILD_DIR/mqtt-broker" ./ )
+  CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 "$GO_BIN" build -o "$BUILD_DIR/$APP_NAME" ./ )
 cp -f "$PROJECT_DIR/broker-config.yml" "$BUILD_DIR/broker-config.yml"
 
 # Fetch Raspberry Pi OS Lite image (cached)
@@ -118,10 +120,10 @@ EOF
 fi
 
 # Install application layout with A/B-friendly structure
-APP_DIR="$ROOT_MNT/opt/hvac-mqtt"
+APP_DIR="$ROOT_MNT/opt/$APP_NAME"
 REL_DIR="$APP_DIR/releases/$VERSION"
 mkdir -p "$REL_DIR"
-install -m 0755 "$BUILD_DIR/mqtt-broker" "$REL_DIR/mqtt-broker"
+install -m 0755 "$BUILD_DIR/$APP_NAME" "$REL_DIR/$APP_NAME"
 install -m 0644 "$BUILD_DIR/broker-config.yml" "$REL_DIR/broker-config.yml"
 # Current symlink and version markers
 ln -snf "$REL_DIR" "$APP_DIR/current"
@@ -129,18 +131,18 @@ echo "$VERSION" > "$APP_DIR/VERSION"
 
 # Systemd service
 mkdir -p "$ROOT_MNT/etc/systemd/system"
-SERVICE_PATH="$ROOT_MNT/etc/systemd/system/hvac-mqtt.service"
-cat > "$SERVICE_PATH" <<'EOF'
+SERVICE_PATH="$ROOT_MNT/etc/systemd/system/$APP_NAME.service"
+cat > "$SERVICE_PATH" <<EOF
 [Unit]
-Description=HVAC MQTT Broker
+Description=$APP_NAME service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/hvac-mqtt/current
-ExecStart=/opt/hvac-mqtt/current/mqtt-broker
+WorkingDirectory=/opt/$APP_NAME/current
+ExecStart=/opt/$APP_NAME/current/$APP_NAME
 Restart=always
 RestartSec=3
 
@@ -150,7 +152,7 @@ EOF
 
 # Enable service on boot
 mkdir -p "$ROOT_MNT/etc/systemd/system/multi-user.target.wants"
-ln -snf ../hvac-mqtt.service "$ROOT_MNT/etc/systemd/system/multi-user.target.wants/hvac-mqtt.service"
+ln -snf ../$APP_NAME.service "$ROOT_MNT/etc/systemd/system/multi-user.target.wants/$APP_NAME.service"
 
 # Update MQTT port in config inside the image
 # Overwrite port in broker-config.yml within current release
@@ -167,6 +169,6 @@ echo "\n✓ Image created: $OUTPUT_IMG"
 echo "  - Hostname: $HOSTNAME"
 echo "  - Static IP: $STATIC_IP (wlan0)"
 echo "  - MQTT Port: $MQTT_PORT"
-echo "  - OTA layout: /opt/hvac-mqtt/releases/$VERSION, current -> releases/$VERSION"
+echo "  - OTA layout: /opt/$APP_NAME/releases/$VERSION, current -> releases/$VERSION"
 echo "  - SSH: enabled"
 

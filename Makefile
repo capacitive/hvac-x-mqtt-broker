@@ -33,7 +33,7 @@ build-arm:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -o $(BUILD_DIR)/$(APP_NAME) ./
 
 image: build-arm
-	STATIC_IP=$(STATIC_IP) MQTT_PORT=$(MQTT_PORT) ROUTER_IP=$(ROUTER_IP) DNS="$(DNS)" HOSTNAME=$(HOSTNAME) \
+	APP_NAME=$(APP_NAME) STATIC_IP=$(STATIC_IP) MQTT_PORT=$(MQTT_PORT) ROUTER_IP=$(ROUTER_IP) DNS="$(DNS)" HOSTNAME=$(HOSTNAME) \
 	WIFI_SSID="$(WIFI_SSID)" WIFI_PSK="$(WIFI_PSK)" VERSION=$(VERSION) \
 	bash scripts/create-image.sh
 
@@ -42,11 +42,11 @@ flash:
 	sudo bash scripts/flash.sh $(DEVICE) $(OUTPUT_IMG)
 
 deploy: build-arm
-	PI_HOST=$(PI_HOST) PI_USER=$(PI_USER) VERSION=$(VERSION) PORT=$(MQTT_PORT) \
+	APP_NAME=$(APP_NAME) PI_HOST=$(PI_HOST) PI_USER=$(PI_USER) VERSION=$(VERSION) PORT=$(MQTT_PORT) \
 	bash scripts/ota/deploy.sh $(PI_HOST)
 
 rollback:
-	PI_HOST=$(PI_HOST) PI_USER=$(PI_USER) bash scripts/ota/rollback.sh $(PI_HOST)
+	APP_NAME=$(APP_NAME) PI_HOST=$(PI_HOST) PI_USER=$(PI_USER) bash scripts/ota/rollback.sh $(PI_HOST)
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUTPUT_IMG)

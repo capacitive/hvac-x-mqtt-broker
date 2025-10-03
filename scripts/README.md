@@ -30,7 +30,7 @@ Below are the key files and how to use them.
 - Base: Raspberry Pi OS Lite (armhf). For Pi Zero W, if needed, set IMAGE_URL to the Legacy Lite URL.
 - Static IP and MQTT port are configurable at build time:
   - Make variables: STATIC_IP, MQTT_PORT, ROUTER_IP, DNS, HOSTNAME, WIFI_SSID, WIFI_PSK, VERSION
-- Installs your app into /opt/hvac-mqtt/releases/, sets current symlink, and installs/enables a systemd service
+- Installs your app into /opt/${APP_NAME}/releases/, sets current symlink, and installs/enables a systemd service
 
 Run:
 ```bash
@@ -46,15 +46,15 @@ Systemd service used for auto-start (excerpt):<br/>
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/hvac-mqtt/current
-ExecStart=/opt/hvac-mqtt/current/mqtt-broker
+WorkingDirectory=/opt/${APP_NAME}/current
+ExecStart=/opt/${APP_NAME}/current/${APP_NAME}
 Restart=always
 ```
 
 Image builder entrypoint (excerpt):<br/>
 **create-image.sh** (scripts/create-image.sh)
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 "$GO_BIN" build -o "$BUILD_DIR/mqtt-broker" ./
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 "$GO_BIN" build -o "$BUILD_DIR/${APP_NAME}" ./
 sed -i "s/^\(\s*port:\s*\).*/\1$MQTT_PORT/" "$REL_DIR/broker-config.yml"
 ln -snf "$REL_DIR" "$APP_DIR/current"
 ```
@@ -85,24 +85,24 @@ echo "$CURRENT_REAL" > "$REMOTE_BASE/previous"
 ln -snf "$REMOTE_REL" "$REMOTE_BASE/current"
 ```
 ```bash
-systemctl restart hvac-mqtt.service
+systemctl restart ${APP_NAME}.service
 ```
 
 Rollback script (excerpt):<br/>
 **rollback.sh** (scripts/ota/rollback.sh)
 ```bash
-PREV="$(cat "/opt/hvac-mqtt/previous")"
+PREV="$(cat "/opt/${APP_NAME}/previous")"
 ```
 ```bash
-ln -snf "$PREV" "/opt/hvac-mqtt/current"
+ln -snf "$PREV" "/opt/${APP_NAME}/current"
 ```
 ```bash
-systemctl restart hvac-mqtt.service
+systemctl restart ${APP_NAME}.service
 ```
 
 ### Configuration management
 - Runtime config file is colocated with the binary as required by your config loader:
-  - /opt/hvac-mqtt/current/broker-config.yml
+  - /opt/${APP_NAME}/current/broker-config.yml
 - Build-time overrides:
   - Static IP via dhcpcd.conf
   - MQTT port baked into installed broker-config.yml during image creation
@@ -145,7 +145,7 @@ file, err := os.Open(filepath.Dir(exe) + "/broker-config.yml")
 ### Testing procedures
 - Local smoke: make build; run build/mqtt-broker locally (won’t test ARM-specifics, just config and startup)
 - Image creation smoke: make image (downloads base, mounts, installs app, config)
-- Flash and boot: sudo make flash; boot Pi; journalctl -u hvac-mqtt; nc -zv 192.168.1.23 1883
+- Flash and boot: sudo make flash; boot Pi; journalctl -u ${APP_NAME}; nc -zv 192.168.1.23 1883
 - OTA: make deploy; verify service restarts; connect to port 1883; simulate failure and test rollback
 
 ### Notes and next steps

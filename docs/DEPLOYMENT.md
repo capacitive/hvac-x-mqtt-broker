@@ -20,7 +20,8 @@ Configure via environment variables as needed (defaults shown):
 - DNS: "1.1.1.1 8.8.8.8"
 - HOSTNAME: hvac-zero
 - WIFI_SSID, WIFI_PSK: optional (Wi-Fi pre-config)
-- VERSION: release version stored in /opt/hvac-mqtt
+- APP_NAME: application name used for binary, service, and /opt directory (default: mqtt-broker)
+- VERSION: release version stored in /opt/${APP_NAME}
 - IMAGE_URL: override base image URL if needed (e.g., legacy)
 
 Build:
@@ -36,8 +37,8 @@ Notes:
 - The image uses Raspberry Pi OS Lite (armhf). For Pi Zero W, you may need the legacy image. Override with:
   `IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_armhf_legacy_latest make image`
 - SSH is enabled by default (touch /boot/ssh)
-- The app is installed at `/opt/hvac-mqtt/releases/<VERSION>` with `current` symlink
-- Systemd service `hvac-mqtt.service` is enabled on boot
+- The app is installed at `/opt/${APP_NAME}/releases/<VERSION>` with `current` symlink
+- Systemd service `${APP_NAME}.service` is enabled on boot
 
 ## Flash the Image to SD Card
 
@@ -82,7 +83,7 @@ make rollback PI_HOST=192.168.1.23 PI_USER=root
 ```
 
 ## Configuration Management
-- Runtime config file: `/opt/hvac-mqtt/current/broker-config.yml`
+- Runtime config file: `/opt/${APP_NAME}/current/broker-config.yml`
 - Build-time overrides:
   - Static IP via `dhcpcd.conf`
   - MQTT port baked into the installed `broker-config.yml`
@@ -99,15 +100,15 @@ To change network settings post-flash, edit `/etc/dhcpcd.conf` on device and reb
 Local:
 - Build host binary and run against default config:
   - `make build`
-  - `./build/mqtt-broker`
+  - `./build/${APP_NAME}`
 - Unit tests: (none added yet) – consider adding tests for config load and topic handling.
 
 Image:
 - `make image` to generate image
 - `make flash DEVICE=/dev/sdX`
 - Boot Pi, `ssh` into it, check service:
-  - `sudo systemctl status hvac-mqtt`
-  - `sudo journalctl -u hvac-mqtt -f`
+  - `sudo systemctl status ${APP_NAME}`
+  - `sudo journalctl -u ${APP_NAME} -f`
 
 OTA:
 - `make deploy PI_HOST=192.168.1.23 VERSION=1.0.2`
