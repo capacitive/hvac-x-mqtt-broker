@@ -11,7 +11,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 DEVICE="${1:-}"
-IMG_PATH="${2:-pi-hvac.img}"
+if [[ -z "${2:-}" ]]; then
+  : "${APP_NAME:?APP_NAME is required when image path is not provided}"
+  IMG_PATH="${APP_NAME}.img"
+else
+  IMG_PATH="$2"
+fi
 
 if [[ -z "$DEVICE" ]]; then
   echo "Usage: sudo $0 /dev/sdX [image.img]" >&2

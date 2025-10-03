@@ -20,8 +20,8 @@ SSH_OPTS=${SSH_OPTS:-"-o StrictHostKeyChecking=no"}
 VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 PORT="${PORT:-1883}"
 
-# App naming (overridable via env or Makefile)
-APP_NAME="${APP_NAME:-mqtt-broker}"
+# App naming (APP_NAME is required; others derive from it if not provided)
+: "${APP_NAME:?APP_NAME is required (set via Makefile or env)}"
 APP_DIR="${APP_DIR:-/opt/$APP_NAME}"
 SERVICE_NAME="${SERVICE_NAME:-$APP_NAME.service}"
 LOG_FILE="${LOG_FILE:-/var/log/$APP_NAME.log}"

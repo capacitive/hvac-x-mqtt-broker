@@ -31,7 +31,7 @@ make image STATIC_IP=192.168.1.23 MQTT_PORT=1883 HOSTNAME=hvac-zero \
   WIFI_SSID="MyWifi" WIFI_PSK="MyPassword" VERSION=1.0.0
 ```
 
-Output: `./pi-hvac.img`
+Output: `./${APP_NAME}.img`
 
 Notes:
 - The image uses Raspberry Pi OS Lite (armhf). For Pi Zero W, you may need the legacy image. Override with:
@@ -39,6 +39,7 @@ Notes:
 - SSH is enabled by default (touch /boot/ssh)
 - The app is installed at `/opt/${APP_NAME}/releases/<VERSION>` with `current` symlink
 - Systemd service `${APP_NAME}.service` is enabled on boot
+- APP_NAME is required by scripts; Makefile provides a default (override with APP_NAME=...)
 
 ## Flash the Image to SD Card
 

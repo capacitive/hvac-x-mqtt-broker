@@ -15,6 +15,9 @@ BUILD_DIR="$PROJECT_DIR/build"
 CACHE_DIR="$PROJECT_DIR/.cache"
 mkdir -p "$BUILD_DIR" "$CACHE_DIR"
 
+# App naming (APP_NAME is required; used for binary, /opt dir, and service name)
+: "${APP_NAME:?APP_NAME is required (set via Makefile or env)}"
+
 # Defaults
 STATIC_IP="${STATIC_IP:-192.168.1.23}"
 MQTT_PORT="${MQTT_PORT:-1883}"
@@ -24,11 +27,9 @@ WIFI_SSID="${WIFI_SSID:-}"
 WIFI_PSK="${WIFI_PSK:-}"
 HOSTNAME="${HOSTNAME:-hvac-zero}"
 IMAGE_URL="${IMAGE_URL:-https://downloads.raspberrypi.com/raspios_lite_armhf_latest}"
-OUTPUT_IMG="$PROJECT_DIR/pi-hvac.img"
+OUTPUT_IMG="$PROJECT_DIR/$APP_NAME.img"
 VERSION_FILE="$PROJECT_DIR/VERSION"
 VERSION="${VERSION:-}"
-# App naming (shared for binary name, directory under /opt, and service name)
-APP_NAME="${APP_NAME:-mqtt-broker}"
 
 if [[ -z "$VERSION" ]]; then
   if [[ -f "$VERSION_FILE" ]]; then VERSION="$(cat "$VERSION_FILE")"; else VERSION="0.1.0"; fi

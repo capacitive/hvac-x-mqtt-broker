@@ -1,17 +1,17 @@
 .PHONY: help build build-arm image flash deploy rollback clean
 
-APP_NAME := mqtt-broker
+APP_NAME := hvacx-broker
 BUILD_DIR := build
-OUTPUT_IMG := pi-hvac.img
+OUTPUT_IMG := ${APP_NAME}.img
 
 # Configurable defaults
 STATIC_IP ?= 192.168.1.23
 MQTT_PORT ?= 1883
 ROUTER_IP ?= 192.168.1.1
 DNS       ?= 1.1.1.1 8.8.8.8
-HOSTNAME  ?= hvac-zero
-WIFI_SSID ?=
-WIFI_PSK  ?=
+HOSTNAME  ?= hvacx-broker
+WIFI_SSID ?= starcaf
+WIFI_PSK  ?= T3l3p0rt
 PI_HOST   ?= 192.168.1.23
 PI_USER   ?= root
 VERSION   ?= $(shell date +%Y%m%d-%H%M%S)

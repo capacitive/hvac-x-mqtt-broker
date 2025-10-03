@@ -14,6 +14,9 @@ What’s included now:
 
 Below are the key files and how to use them.
 
+
+Note on naming: APP_NAME is required by the scripts (enforced); the Makefile provides a default and passes it through. The output image is named `${APP_NAME}.img` and the service is `${APP_NAME}.service` under `/opt/${APP_NAME}`.
+
 ### What was added
 - Makefile targets: build-arm, image, flash, deploy, rollback
 - Scripts:
@@ -34,7 +37,7 @@ Below are the key files and how to use them.
 
 Run:
 ```bash
-make image STATIC_IP=192.168.1.23 MQTT_PORT=1883 HOSTNAME=hvac-zero VERSION=1.0.0
+make image STATIC_IP=192.168.1.23 MQTT_PORT=1883 HOSTNAME=${HOSTNAME} VERSION=1.0.0
 ```
 ```bash
 sudo make flash DEVICE=/dev/sdX
