@@ -177,7 +177,7 @@ file, err := os.Open(filepath.Dir(exe) + "/broker-config.yml")
 - IMAGE_URL: https://downloads.raspberrypi.com/raspios_lite_armhf_latest — Source URL for Raspberry Pi OS Lite (override for legacy)
 - PI_HOST: 192.168.1.23 — Target Pi hostname/IP for OTA deploy/rollback
 - PI_USER: root — SSH user for OTA operations
-- VERSION: 20251003-121530 — Release identifier used as releases/<VERSION> and package naming
+- VERSION: 0.1.0 — Semantic version from VERSION file; used as releases/<VERSION> and package naming
 - PORT: 1883 — TCP port used in deploy health check (nc) against the target
 - SSH_OPTS: -o StrictHostKeyChecking=no — Extra SSH/SCP options during OTA
 - APP_DIR: /opt/${APP_NAME} — Install base on the Pi; contains releases/, current, previous

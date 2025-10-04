@@ -17,8 +17,20 @@ BUILD_DIR="$PROJECT_DIR/build"
 PI_HOST="${1:-${PI_HOST:-192.168.1.23}}"
 PI_USER="${PI_USER:-root}"
 SSH_OPTS=${SSH_OPTS:-"-o StrictHostKeyChecking=no"}
-VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 PORT="${PORT:-1883}"
+
+# Semantic versioning from VERSION file
+VERSION_FILE="$PROJECT_DIR/VERSION"
+if [[ ! -f "$VERSION_FILE" ]]; then
+  echo "Error: VERSION file not found at $VERSION_FILE" >&2
+  echo "Create it with: echo '0.1.0' > VERSION" >&2
+  exit 1
+fi
+VERSION="$(cat "$VERSION_FILE")"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: VERSION must be semantic (e.g., 0.1.0), got: $VERSION" >&2
+  exit 1
+fi
 
 # App naming (APP_NAME is required; others derive from it if not provided)
 : "${APP_NAME:?APP_NAME is required (set via Makefile or env)}"

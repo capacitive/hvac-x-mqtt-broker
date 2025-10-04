@@ -28,11 +28,18 @@ WIFI_PSK="${WIFI_PSK:-}"
 HOSTNAME="${HOSTNAME:-hvac-zero}"
 IMAGE_URL="${IMAGE_URL:-https://downloads.raspberrypi.com/raspios_lite_armhf_latest}"
 OUTPUT_IMG="$PROJECT_DIR/$APP_NAME.img"
-VERSION_FILE="$PROJECT_DIR/VERSION"
-VERSION="${VERSION:-}"
 
-if [[ -z "$VERSION" ]]; then
-  if [[ -f "$VERSION_FILE" ]]; then VERSION="$(cat "$VERSION_FILE")"; else VERSION="0.1.0"; fi
+# Semantic versioning from VERSION file
+VERSION_FILE="$PROJECT_DIR/VERSION"
+if [[ ! -f "$VERSION_FILE" ]]; then
+  echo "Error: VERSION file not found at $VERSION_FILE" >&2
+  echo "Create it with: echo '0.1.0' > VERSION" >&2
+  exit 1
+fi
+VERSION="$(cat "$VERSION_FILE")"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: VERSION must be semantic (e.g., 0.1.0), got: $VERSION" >&2
+  exit 1
 fi
 
 # Use prebuilt ARMv6 binary (built by Makefile's build-arm). Avoid building under sudo.
