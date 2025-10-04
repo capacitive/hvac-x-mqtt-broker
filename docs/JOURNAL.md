@@ -206,6 +206,59 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
 
       make tartigrade-image V=1
 
+- Q4 (User, verbatim):
+  "How much effort would it be to rename all 'tartigrade' references/directories/filenames to 'tardigrade' (omit the quotes, of course).  Scripts will need to be updated too, and any other artifact bearing the name 'tartigrade'. I mispelled 'tardigrade' and I'm embarrassed."
+
+  - Assistant (verbatim):
+    Short answer
+    Low effort. Expect ~20–40 minutes end-to-end:
+    - 5–10 min to inventory all occurrences
+    - 5–10 min to rename directory, update scripts/Makefile/docs
+    - 10–20 min to rebuild and sanity‑boot test
+
+    What changes are needed
+    - Directory and filenames
+      - Rename directory: tartigrade → tardigrade
+      - Update any paths that reference tartigrade (Makefile targets, scripts)
+    - Strings and identifiers
+      - Update messages and tags (e.g., “hello from tartigrade…”, logger tag)
+      - Update journal/docs references
+    - Build/test
+      - Rebuild image, reflash, verify boot and hello message still appear
+      - Smoke check the flash script path updates
+
+    Proposed steps (safe and reversible)
+    - Inventory occurrences (fast)
+      - Search all files for “tartigrade” to get a precise list
+    - Apply renames
+      - git mv tartigrade tardigrade
+      - Update Makefile targets and calls (tartigrade-image/… → tardigrade-…)
+      - Update scripts (paths and text strings)
+      - Update hello script message and logger tag
+      - Update docs (JOURNAL.md, BUILDROOT.md, etc.)
+    - Verify
+      - make tardigrade-image → now tardigrade-image (or your preferred target name)
+      - Reflash; confirm console and motd show “tardigrade”
+      - Quick on-device df -h sanity check (unchanged by rename)
+
+    Example of minimal edits
+    - Makefile target rename:
+      tardigrade-image:
+        bash tardigrade/build-image.sh
+
+    - Hello script message/tag:
+      MSG="hello from tardigrade: minimal boot successful"
+      logger -t tardigrade "$MSG" 2>/dev/null || true
+
+    Notes
+    - Git submodule (.buildroot) is unaffected.
+    - Journal updates will be included (verbatim) as part of the checkpoint once done.
+
+    If you’d like, I can proceed now and keep this as a “rename checkpoint” in the journal. Prefer target names “tardigrade-image/tardigrade-flash,” or keep old target names for continuity?
+
+  - Decision: Per user, skip the rename for now; captured here for a future checkpoint.
+
+
 - Objective: Replace Raspberry Pi OS Lite with a minimal Buildroot-based OS that boots without any first-boot interaction and runs the broker under tight constraints.
 - Decision: Start with the smallest practical boot target that still allows incremental growth.
 - Options considered:

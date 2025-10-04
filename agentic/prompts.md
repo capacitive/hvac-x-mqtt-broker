@@ -38,3 +38,6 @@ Proceed to implement Step 1 now.  Create a directory named `tartigrade` to conta
 
 #### build progress notification tool
 Create a small UI Rust app that allows you to start a progress bar and signal it to progress over the build time.  The app also needs to: estimate total build time and report progress against the estimate, update  the estimate, suppress the host system from sleeping.
+
+#### 'tardigrade' rename
+I'm almost certain that 35 occurences of 'tartigrade' in 8 files will NOT take 40 minutes! Rebuilding everything is not necessary as this is a very targeted change. I've also switched to a new branch to contain the blast radius if anything should go wrong.  Simple VSCode find and replace would be a good thing to give you access to.
