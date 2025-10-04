@@ -17,7 +17,7 @@ PI_USER   ?= root
 
 # Optional image/timezone and minimal user defaults
 IMAGE_URL ?= https://downloads.raspberrypi.com/raspios_lite_armhf_latest
-TIMEZONE  ?= America/New York 
+TIMEZONE  ?= America/New York
 RPI_USER  ?= hvacx
 RPI_PASS  ?= hv@cmqttbr0k3r
 # Auto-pick an existing local SSH public key if present (non-destructive)
@@ -28,13 +28,15 @@ DEPLOY_NEEDS_SUDO ?= 0
 
 help:
 	@echo "Targets:"
-	@echo "  build         - Build local binary for host"
-	@echo "  build-arm     - Cross-compile for Raspberry Pi Zero W (ARMv6)"
-	@echo "  image         - Create Pi OS Lite image with app pre-installed"
-	@echo "  flash         - Flash $(OUTPUT_IMG) to SD card (interactive device selection)"
-	@echo "  deploy        - OTA deploy to running Pi (PI_HOST=$(PI_HOST))"
-	@echo "  rollback      - OTA rollback to previous version on device"
-	@echo "  clean         - Remove build artifacts"
+	@echo "  build                 - Build local binary for host"
+	@echo "  build-arm             - Cross-compile for Raspberry Pi Zero W (ARMv6)"
+	@echo "  image                 - Create Pi OS Lite image with app pre-installed"
+	@echo "  flash                 - Flash $(OUTPUT_IMG) to SD card (interactive device selection)"
+	@echo "  deploy                - OTA deploy to running Pi (PI_HOST=$(PI_HOST))"
+	@echo "  rollback              - OTA rollback to previous version on device"
+	@echo "  tartigrade-image      - Build Buildroot sdcard.img for Step 1 (Hello World)"
+	@echo "  tartigrade-flash      - Flash Buildroot sdcard.img via interactive selector"
+	@echo "  clean                 - Remove build artifacts"
 
 build:
 	go build -o $(BUILD_DIR)/$(APP_NAME) ./
@@ -82,4 +84,17 @@ rollback:
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUTPUT_IMG)
+
+.PHONY: tartigrade-image tartigrade-flash
+
+tartigrade-image:
+	bash tartigrade/build-image.sh
+
+tartigrade-flash:
+	@if [ ! -f ".buildroot/output/images/sdcard.img" ]; then \
+		echo "Buildroot image not found. Run 'make tartigrade-image' first."; \
+		exit 1; \
+	fi
+	sudo bash scripts/flash.sh .buildroot/output/images/sdcard.img
+
 

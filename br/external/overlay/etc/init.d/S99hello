@@ -1,0 +1,21 @@
+#!/bin/sh
+# Tartigrade Step 1 hello message
+# Run late in boot; also write to console and motd for visibility
+
+MSG="hello from tartigrade: minimal boot successful"
+
+# Try to log to syslog (non-fatal if busybox syslog not present)
+logger -t tartigrade "$MSG" 2>/dev/null || true
+
+# Wait briefly for console to be ready and write directly to tty1
+for i in 1 2 3 4 5; do
+    [ -e /dev/tty1 ] && break
+    sleep 1
+done
+[ -e /dev/tty1 ] && echo "$MSG" > /dev/tty1 || true
+
+# Append to motd so it's visible on login
+( echo "$MSG" >> /etc/motd ) 2>/dev/null || true
+
+exit 0
+

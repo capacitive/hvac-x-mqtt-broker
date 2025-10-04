@@ -32,3 +32,9 @@ The application in this repo acts as an event server/broker and has a ./broker-c
 - Runs on top of kernel via syscalls
 
 Attempt a custom linux image build, but provide options for using a recognized, tested and available minimal RPI Zero Linux distro for the image's OS.  Keep in mind this device we're creating an image for is a RPI Zero W (wireless and bluetooth).
+
+#### bare bones RPI Zero 2 W OS
+Proceed to implement Step 1 now.  Create a directory named `tartigrade` to contain your work. This will be the name of the application we create to codify the process of creating this explain, build, test, and flash process.  Reuse the existing flash script and a create new one for this image building process.  Prompt me when it's time to flash and I'll execute it.  We'll use this script for now, but I'd like a compiled app to govern the process, not shell scripts.  The script world is rife with issues and features it does not have, and lacks testability.  We'll convert our image building and flashing process to a Golang app later on, but before we get too locked in to scripts. We'll leverage Go's ability to run program code as scripts, but have a mainline tool that automates the entire process end-to-end.  I'd like the app to have verbose and interactive modes to support teaching newcomers to the embedded microcontroller space.
+
+#### build progress notification tool
+Create a small UI Rust app that allows you to start a progress bar and signal it to progress over the build time.  The app also needs to: estimate total build time and report progress against the estimate, update  the estimate, suppress the host system from sleeping.

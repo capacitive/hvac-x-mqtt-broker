@@ -29,7 +29,7 @@ scan_devices() {
             device=$(echo $line | awk '{print $1}')
             model=$(echo $line | awk '{print $2}')
             size=$(echo $line | awk '{print $3}')
-            
+
             # Convert size to MB for comparison
             if [[ $size == *"G" ]]; then
                 size_mb=$(echo $size | sed 's/G//' | awk '{print int($1 * 1024)}')
@@ -38,7 +38,7 @@ scan_devices() {
             else
                 size_mb=0
             fi
-            
+
             # Only include devices with adequate capacity
             if [[ $size_mb -ge $MIN_SIZE_MB ]]; then
                 USB_DEVICES+=("$device:$model:$size")
@@ -163,6 +163,39 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Extra flush for good measure; ignore if not supported
     blockdev --flushbufs "$USB_DEVICE" 2>/dev/null || true
     sync
+
+    echo "Resizing root filesystem to fill device..."
+    # Re-read partition table (ignore errors on some kernels)
+    partprobe "$USB_DEVICE" 2>/dev/null || true
+    sleep 1
+
+    # Determine partition 2 path (/dev/sdb2 vs /dev/mmcblk0p2)
+    if [[ "$USB_DEVICE" =~ (mmcblk|nvme) ]]; then
+        PART2="${USB_DEVICE}p2"
+    else
+        PART2="${USB_DEVICE}2"
+    fi
+
+    # Grow partition 2 to 100% of device and expand filesystem
+    if command -v parted >/dev/null 2>&1; then
+        echo "Resizing partition 2 to 100% with parted..."
+        # Non-interactive resize; ignore errors if table re-read lags
+        parted -s "$USB_DEVICE" ---pretend-input-tty unit % print >/dev/null 2>&1 || true
+        parted -s "$USB_DEVICE" ---pretend-input-tty resizepart 2 100% >/dev/null 2>&1 || true
+        partprobe "$USB_DEVICE" 2>/dev/null || true
+        sleep 1
+    else
+        echo "parted not found; skipping partition resize step"
+    fi
+
+    if command -v e2fsck >/dev/null 2>&1 && command -v resize2fs >/dev/null 2>&1; then
+        echo "Checking and resizing filesystem on $PART2..."
+        e2fsck -f -p "$PART2" 2>/dev/null || true
+        resize2fs "$PART2" 2>/dev/null || true
+    else
+        echo "e2fsck/resize2fs not available; skipping filesystem expansion"
+    fi
+
     echo "Ejecting device..."
     eject $USB_DEVICE 2>/dev/null || echo "Manual eject required"
     echo "Flash complete! Device is safe to remove."
