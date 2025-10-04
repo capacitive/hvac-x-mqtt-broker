@@ -1,175 +1,172 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-# Flash the built image to an SD card device safely.
-# Usage: sudo ./scripts/flash.sh <image.img>
-# Device selection is always interactive.
-
-if [[ $EUID -ne 0 ]]; then
-  echo "Please run as root (sudo)." >&2
-  exit 1
+if [ "$EUID" -ne 0 ]; then
+    echo "Run as root: sudo ./scripts/flash.sh <image.img>"
+    exit 1
 fi
 
-if [[ -z "${1:-}" ]]; then
-  : "${APP_NAME:?APP_NAME is required when image path is not provided}"
-  IMG_PATH="${APP_NAME}.img"
+if [ -z "${1:-}" ]; then
+    : "${APP_NAME:?APP_NAME is required when image path is not provided}"
+    IMG_PATH="${APP_NAME}.img"
 else
-  IMG_PATH="$1"
+    IMG_PATH="$1"
 fi
 
-# Always perform interactive device selection
-# Ensure image exists before we compute size/filters
-if [[ ! -f "$IMG_PATH" ]]; then
-  echo "Error: Image not found: $IMG_PATH" >&2
-  exit 1
+if [ ! -f "$IMG_PATH" ]; then
+    echo "Image not found: $IMG_PATH"
+    exit 1
 fi
 
-# Compute minimum device size (image + 100MB buffer)
+# Get image size in MB
 IMAGE_SIZE_MB=$(du -m "$IMG_PATH" | cut -f1)
-MIN_SIZE_MB=$((IMAGE_SIZE_MB + 100))
+MIN_SIZE_MB=$((IMAGE_SIZE_MB + 100))  # Add 100MB buffer
 
+# Function to scan for USB devices
 scan_devices() {
-  USB_DEVICES=()
-  while IFS= read -r line; do
-    # Prefer key=value pairs for robust parsing
-    # Example: NAME="sdb" MODEL="SanDisk Extreme" SIZE="59.5G" TRAN="usb"
-    eval "$line"
-    # Require USB transport and size >= MIN_SIZE_MB
-    if [[ "${TRAN:-}" == "usb" ]]; then
-      size_mb=0
-      case "${SIZE:-}" in
-        *T) base=${SIZE%T}; size_mb=$(awk "BEGIN{print int($base*1024*1024)}") ;;
-        *G) base=${SIZE%G}; size_mb=$(awk "BEGIN{print int($base*1024)}") ;;
-        *M) base=${SIZE%M}; size_mb=$(awk "BEGIN{print int($base)}") ;;
-        *)  size_mb=0 ;;
-      esac
-      if [[ $size_mb -ge $MIN_SIZE_MB ]]; then
-        USB_DEVICES+=("${NAME:-}:${MODEL:-}:${SIZE:-}")
-      fi
-    fi
-  done < <(lsblk -d -P -o NAME,MODEL,SIZE,TRAN -e7)
+    USB_DEVICES=()
+    while IFS= read -r line; do
+        if [[ $line == *"usb"* ]]; then
+            device=$(echo $line | awk '{print $1}')
+            model=$(echo $line | awk '{print $2}')
+            size=$(echo $line | awk '{print $3}')
+            
+            # Convert size to MB for comparison
+            if [[ $size == *"G" ]]; then
+                size_mb=$(echo $size | sed 's/G//' | awk '{print int($1 * 1024)}')
+            elif [[ $size == *"M" ]]; then
+                size_mb=$(echo $size | sed 's/M//' | awk '{print int($1)}')
+            else
+                size_mb=0
+            fi
+            
+            # Only include devices with adequate capacity
+            if [[ $size_mb -ge $MIN_SIZE_MB ]]; then
+                USB_DEVICES+=("$device:$model:$size")
+            fi
+        fi
+    done < <(lsblk -o NAME,MODEL,SIZE,TRAN -e7 | grep -v "^NAME")
 }
 
-echo "Scanning for USB mass storage devices (min ${MIN_SIZE_MB}MB)..."
-scan_devices
+# Continuous device scanning and in-place UI updates
+SCAN_INTERVAL=1
+PREV_LIST=""
 
-if [[ ${#USB_DEVICES[@]} -eq 0 ]]; then
-  echo "No suitable devices found. Insert a USB device or press 'm' for manual entry..."
-
-  MONITORING=0
-  if command -v inotifywait >/dev/null 2>&1; then
-    MONITORING=1
-    {
-      inotifywait -q -m /dev -e create 2>/dev/null | while read _ _ file; do
-        if [[ $file == sd* ]]; then
-          sleep 1
-          scan_devices
-          if [[ ${#USB_DEVICES[@]} -gt 0 ]]; then
-            echo -e "\nUSB device detected."
-            pkill -P $$ inotifywait 2>/dev/null || true
-            break
-          fi
-        fi
-      done
-    } &
-    MONITOR_PID=$!
-  fi
-
-  while [[ ${#USB_DEVICES[@]} -eq 0 ]]; do
-    # Non-fatal read for 'm'
-    set +e
-    read -r -t 1 -n 1 input
-    rc=$?
-    set -e
-    if [[ $rc -eq 0 && "$input" == "m" ]]; then
-      [[ $MONITORING -eq 1 ]] && kill "$MONITOR_PID" 2>/dev/null || true
-      break
-    fi
-    scan_devices
-  done
-
-  [[ $MONITORING -eq 1 ]] && kill "$MONITOR_PID" 2>/dev/null || true
-fi
-
-if [[ ${#USB_DEVICES[@]} -eq 0 ]]; then
-  read -r -p "Device path (e.g., /dev/sdb): " USB_DEVICE
-  DEVICE="$USB_DEVICE"
-else
-  while true; do
-    echo "Found USB devices:"
-    for i in "${!USB_DEVICES[@]}"; do
-      IFS=':' read -r dev model size <<< "${USB_DEVICES[$i]}"
-      echo "$((i+1))) $model $size (/dev/$dev)"
-    done
-    echo "$(( ${#USB_DEVICES[@]} + 1 ))) Manual entry"
-    echo "r) Rescan devices"
-    read -r -p "Select device [1-$(( ${#USB_DEVICES[@]} + 1 ))], 'r' to rescan: " choice
-    if [[ "$choice" == "r" ]]; then
-      echo "Rescanning..."
-      scan_devices
-      continue
-    elif [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 && $choice -le ${#USB_DEVICES[@]} ]]; then
-      IFS=':' read -r dev model size <<< "${USB_DEVICES[$((choice-1))]}"
-      DEVICE="/dev/$dev"
-      echo "Selected: $model $size ($DEVICE)"
-      read -r -p "Confirm selection? [y/N/r=reselect]: " confirm
-      if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        break
-      elif [[ "$confirm" == "r" ]]; then
-        continue
-      else
-        echo "Selection cancelled. Choose again."
-        continue
-      fi
-    elif [[ "$choice" -eq $(( ${#USB_DEVICES[@]} + 1 )) ]]; then
-      read -r -p "Device path (e.g., /dev/sdb): " USB_DEVICE
-      DEVICE="$USB_DEVICE"
-      break
+render_menu() {
+    clear
+    echo "USB Mass Storage Device Selection (min ${MIN_SIZE_MB}MB)"
+    echo "(List updates automatically when devices are inserted/removed)"
+    echo
+    if [ ${#USB_DEVICES[@]} -eq 0 ]; then
+        echo "No suitable devices found. Waiting for USB device..."
+        echo "Press 'm' then Enter for manual entry"
     else
-      echo "Invalid selection. Try again."
-      continue
+        echo "Found USB devices:"
+        for i in "${!USB_DEVICES[@]}"; do
+            IFS=':' read -r dev model size <<< "${USB_DEVICES[$i]}"
+            echo "  $((i+1))) $model ${size} (/dev/$dev)"
+        done
+        echo "  $((${#USB_DEVICES[@]}+1))) Manual entry"
+        echo
+        echo -n "Select device [1-$((${#USB_DEVICES[@]}+1)) or 'm']: "
     fi
-  done
-fi
+}
 
-if [[ ! -b "$DEVICE" ]]; then
-  echo "Error: $DEVICE is not a block device." >&2
-  lsblk
-  exit 1
-fi
+# Initial draw
+render_menu
 
-if [[ ! -f "$IMG_PATH" ]]; then
-  echo "Error: Image not found: $IMG_PATH" >&2
-  exit 1
-fi
+# Main loop: scan, redraw on change, accept input non-blocking
+while true; do
+    # Scan devices
+    scan_devices
+    CUR_LIST="$(printf "%s|" "${USB_DEVICES[@]}")"
 
-echo "About to write $IMG_PATH to $DEVICE (this will ERASE it)."
-echo -n "Type YES to proceed: "
-read -r CONFIRM
-if [[ "$CONFIRM" != "YES" ]]; then
-  echo "Aborted."
-  exit 1
-fi
+    # Redraw only if changed
+    if [[ "$CUR_LIST" != "$PREV_LIST" ]]; then
+        PREV_LIST="$CUR_LIST"
+        render_menu
+    fi
 
-# Unmount any mounted partitions from the device
-for p in $(lsblk -ln -o NAME "/dev/$(basename "$DEVICE")" | tail -n +2); do
-  mnt="/dev/$p"
-  if mount | grep -q "^$mnt "; then
-    umount "$mnt"
-  fi
-  if mount | grep -q "$mnt "; then
-    umount -l "$mnt" || true
-  fi
+    # Read input with short timeout so we keep scanning
+    if [ ${#USB_DEVICES[@]} -eq 0 ]; then
+        read -r -t "$SCAN_INTERVAL" input || true
+        if [[ "${input:-}" == "m" ]]; then
+            echo
+            read -r -p "Device path (e.g., /dev/sdb): " USB_DEVICE
+            break
+        fi
+        continue
+    else
+        read -r -t "$SCAN_INTERVAL" choice || true
+        if [[ -z "${choice:-}" ]]; then
+            continue
+        fi
+        if [[ "$choice" == "m" || "$choice" == "M" ]]; then
+            echo
+            read -r -p "Device path (e.g., /dev/sdb): " USB_DEVICE
+            break
+        fi
+        if [[ "$choice" =~ ^[0-9]+$ ]]; then
+            if [[ $choice -ge 1 && $choice -le ${#USB_DEVICES[@]} ]]; then
+                IFS=':' read -r dev model size <<< "${USB_DEVICES[$((choice-1))]}"
+                USB_DEVICE="/dev/$dev"
+                echo
+                echo "Selected: $model $size ($USB_DEVICE)"
+                read -r -p "Confirm selection? [y/N]: " confirm
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    break
+                else
+                    render_menu
+                    continue
+                fi
+            elif [[ $choice -eq $((${#USB_DEVICES[@]}+1)) ]]; then
+                echo
+                read -r -p "Device path (e.g., /dev/sdb): " USB_DEVICE
+                break
+            else
+                echo
+                echo "Invalid selection."
+                sleep 1
+                render_menu
+                continue
+            fi
+        fi
+    fi
 done
 
-# Write image
-if command -v pv >/dev/null 2>&1; then
-  pv "$IMG_PATH" | dd of="$DEVICE" bs=4M conv=fsync status=progress
-else
-  dd if="$IMG_PATH" of="$DEVICE" bs=4M conv=fsync status=progress
-fi
-sync
+DEVICE="$USB_DEVICE"
 
-echo ""
-echo "\u2713 Flash complete. You can now insert the SD card into the Pi."
+DEVICE="$USB_DEVICE"
+
+echo
+echo "Selected device: ${DEVICE_INFO:-$USB_DEVICE}"
+echo "Image: $IMG_PATH"
+echo "WARNING: This will erase ALL data on $USB_DEVICE"
+read -p "Continue? [y/N]: " -n 1 -r
+echo
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # Unmount any mounted partitions from the device
+    for p in $(lsblk -ln -o NAME "/dev/$(basename "$DEVICE")" 2>/dev/null | tail -n +2); do
+        mnt="/dev/$p"
+        if mount | grep -q "^$mnt "; then
+            umount "$mnt" 2>/dev/null || true
+        fi
+        if mount | grep -q "$mnt "; then
+            umount -l "$mnt" 2>/dev/null || true
+        fi
+    done
+
+    echo "Flashing to $USB_DEVICE..."
+    # Use dd's progress which reflects actual bytes written; avoid pv's early 100% due to read-side completion
+    dd if="$IMG_PATH" of="$USB_DEVICE" bs=4M iflag=fullblock oflag=direct conv=fsync status=progress
+    echo "Finalizing writes (sync)..."
+    # Extra flush for good measure; ignore if not supported
+    blockdev --flushbufs "$USB_DEVICE" 2>/dev/null || true
+    sync
+    echo "Ejecting device..."
+    eject $USB_DEVICE 2>/dev/null || echo "Manual eject required"
+    echo "Flash complete! Device is safe to remove."
+else
+    echo "Cancelled."
+fi
 

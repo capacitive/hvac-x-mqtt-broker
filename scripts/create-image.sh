@@ -94,9 +94,83 @@ ROOT_MNT="$(mktemp -d)"
 mount "$BOOT_PART" "$BOOT_MNT"
 mount "$ROOT_PART" "$ROOT_MNT"
 
-echo "Configuring hostname, SSH, networking, and application..."
+echo "Configuring hostname, SSH, networking, minimal user, and application..."
 # Enable SSH by creating an empty file in /boot
 : > "$BOOT_MNT/ssh"
+
+# Minimal user provisioning inside the image (single user, single private group)
+RPI_USER="${RPI_USER:-}"
+RPI_PASS="${RPI_PASS:-}"
+if [[ -n "$RPI_USER" && -n "$RPI_PASS" ]]; then
+  if command -v openssl >/dev/null 2>&1; then
+    USER_HASH="$(openssl passwd -6 "$RPI_PASS")"
+  else
+    echo "Error: openssl is required to generate password hash" >&2
+    exit 1
+  fi
+  PASSWD_FILE="$ROOT_MNT/etc/passwd"
+  SHADOW_FILE="$ROOT_MNT/etc/shadow"
+  GROUP_FILE="$ROOT_MNT/etc/group"
+  # Find next free UID/GID >=1000
+  NEXT_UID=$(awk -F: '($3>=1000 && $3<65534){if($3>m)m=$3} END{print (m?m:999)+1}' "$PASSWD_FILE")
+  NEXT_GID=$(awk -F: '($3>=1000 && $3<65534){if($3>m)m=$3} END{print (m?m:999)+1}' "$GROUP_FILE")
+  # Create group and user with no supplementary groups
+  echo "$RPI_USER:x:$NEXT_GID:" >> "$GROUP_FILE"
+  echo "$RPI_USER:x:$NEXT_UID:$NEXT_GID::/home/$RPI_USER:/bin/bash" >> "$PASSWD_FILE"
+  echo "$RPI_USER:$USER_HASH:19000:0:99999:7:::" >> "$SHADOW_FILE"
+  # Home directory and optional SSH key
+  mkdir -p "$ROOT_MNT/home/$RPI_USER"
+  chown -R "$NEXT_UID:$NEXT_GID" "$ROOT_MNT/home/$RPI_USER"
+  if [[ -n "${RPI_SSH_PUBKEY:-}" ]]; then
+    mkdir -p "$ROOT_MNT/home/$RPI_USER/.ssh"
+    echo "$RPI_SSH_PUBKEY" > "$ROOT_MNT/home/$RPI_USER/.ssh/authorized_keys"
+    chmod 700 "$ROOT_MNT/home/$RPI_USER/.ssh"
+    chmod 600 "$ROOT_MNT/home/$RPI_USER/.ssh/authorized_keys"
+    chown -R "$NEXT_UID:$NEXT_GID" "$ROOT_MNT/home/$RPI_USER/.ssh"
+  fi
+fi
+# Disable first-boot wizard and remove default 'pi' user if present
+if [[ -n "$RPI_USER" ]]; then
+  # Remove legacy default user 'pi' to avoid rename prompts
+  sed -i -e '/^pi:/d' "$ROOT_MNT/etc/passwd" 2>/dev/null || true
+  sed -i -e '/^pi:/d' "$ROOT_MNT/etc/shadow" 2>/dev/null || true
+  sed -i -e '/^pi:/d' "$ROOT_MNT/etc/group" 2>/dev/null || true
+  rm -rf "$ROOT_MNT/home/pi" 2>/dev/null || true
+
+  # Proactively disable first-boot services if present
+  for d in \
+    "$ROOT_MNT/etc/systemd/system/multi-user.target.wants" \
+    "$ROOT_MNT/etc/systemd/system/sysinit.target.wants" \
+    "$ROOT_MNT/etc/systemd/system" \
+  ; do
+    rm -f "$d/raspi-config.service" 2>/dev/null || true
+    rm -f "$d/raspi-firstboot.service" 2>/dev/null || true
+    rm -f "$d/firstboot.service" 2>/dev/null || true
+  done
+fi
+# Belt-and-suspenders: mask first-boot units and add kernel cmdline masks
+# Mask units in rootfs so even if present they won't start
+for svc in raspi-config.service firstboot.service raspi-firstboot.service; do
+  ln -snf /dev/null "$ROOT_MNT/etc/systemd/system/$svc" 2>/dev/null || true
+  rm -f "$ROOT_MNT/etc/systemd/system/multi-user.target.wants/$svc" 2>/dev/null || true
+  rm -f "$ROOT_MNT/etc/systemd/system/sysinit.target.wants/$svc" 2>/dev/null || true
+  rm -f "$ROOT_MNT/lib/systemd/system/$svc" 2>/dev/null || true
+  rm -f "$ROOT_MNT/usr/lib/systemd/system/$svc" 2>/dev/null || true
+done
+# Also add systemd.mask=... on kernel cmdline to prevent activation at boot
+if [ -f "$BOOT_MNT/cmdline.txt" ]; then
+  if ! grep -q "systemd.mask=raspi-config.service" "$BOOT_MNT/cmdline.txt"; then
+    sed -i 's/$/ systemd.mask=raspi-config.service systemd.mask=firstboot.service systemd.mask=raspi-firstboot.service/' "$BOOT_MNT/cmdline.txt"
+  fi
+fi
+
+
+
+# Optional timezone (e.g., TIMEZONE="America/Los_Angeles")
+if [[ -n "${TIMEZONE:-}" ]]; then
+  echo "$TIMEZONE" > "$ROOT_MNT/etc/timezone"
+  ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$ROOT_MNT/etc/localtime" 2>/dev/null || true
+fi
 
 # Hostname
 echo "$HOSTNAME" > "$ROOT_MNT/etc/hostname"
@@ -136,6 +210,15 @@ install -m 0644 "$BUILD_DIR/broker-config.yml" "$REL_DIR/broker-config.yml"
 # Current symlink and version markers
 ln -snf "$REL_DIR" "$APP_DIR/current"
 echo "$VERSION" > "$APP_DIR/VERSION"
+# If a minimal user was provisioned, ensure ownership of app tree so the service can read/execute
+if [[ -n "$RPI_USER" ]]; then
+  # Resolve UID:GID for chown
+  _UID=$(awk -F: -v u="$RPI_USER" '($1==u){print $3}' "$ROOT_MNT/etc/passwd" )
+  _GID=$(awk -F: -v g="$RPI_USER" '($1==g){print $3}' "$ROOT_MNT/etc/group" )
+  if [[ -n "$_UID" && -n "$_GID" ]]; then
+    chown -R "$_UID:$_GID" "$APP_DIR"
+  fi
+fi
 
 # Systemd service
 mkdir -p "$ROOT_MNT/etc/systemd/system"
@@ -148,7 +231,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
+User=${RPI_USER:-root}
 WorkingDirectory=/opt/$APP_NAME/current
 ExecStart=/opt/$APP_NAME/current/$APP_NAME
 Restart=always
