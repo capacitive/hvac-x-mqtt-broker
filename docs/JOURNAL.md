@@ -27,9 +27,9 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
 
   Option analysis with brief technical and ELIM5 explanations
 - Procedure (implemented):
-  - Create tartigrade/ orchestration with build-image.sh
+  - Create tardigrade/ orchestration with build-image.sh
   - Scaffold Buildroot external tree at br/external with overlay and post-build hook
-  - Add Makefile targets: tartigrade-image, tartigrade-flash
+  - Add Makefile targets: tardigrade-image, tardigrade-flash
   - Use raspberrypi3_defconfig as base, override DTS to bcm2710-rpi-zero-2-w and add overlay
 - Expected output: .buildroot/output/images/sdcard.img
 - Current status: Building image (first build may take 20–60 minutes). I’ll prompt when it’s time to flash.
@@ -60,11 +60,41 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
 ### Repository hygiene: Buildroot as submodule
 - Action: Registered .buildroot as a git submodule using its existing remote URL (https://gitlab.com/buildroot.org/buildroot.git).
 - Rationale: Makes the Buildroot tree explicit, reproducible, and easy to update via standard submodule flows.
-- Script safeguard: Updated tartigrade/build-image.sh to detect a git work tree (covers submodules where .git is a file) and skip re-cloning.
+- Script safeguard: Updated tardigrade/build-image.sh to detect a git work tree (covers submodules where .git is a file) and skip re-cloning.
 - Next steps: Commit with an appropriate message when ready (we have not committed on your behalf).
 
 - Next verification:
+
+### Checkpoint: Rename execution (tartigrade → tardigrade)
+- Action: Renamed directory via git mv tartigrade → tardigrade.
+- Updated files:
+  - Makefile targets and help: tardigrade-image, tardigrade-flash; path: bash tardigrade/build-image.sh
+  - tardigrade/build-image.sh: log prefixes updated to [tardigrade]
+  - br/external/overlay/etc/init.d/S99hello: message, logger tag, and header updated to tardigrade
+  - br/external/board/hvacx/rpi0_2w/post-build.sh: banner updated to “tardigrade Step 1 (Hello World)”
+  - br/external/external.desc and external.mk: updated descriptions to tardigrade
+- Journal policy: Prior quotes remain verbatim (so earlier occurrences of “tartigrade” in Q&A/logs are preserved); going forward we use “tardigrade”.
+- Build verification: Ran `make tardigrade-image`.
+  - Result: Success. Image generated at .buildroot/output/images/sdcard.img
+  - Notes:
+    - Warnings: kconfig override warnings for BR2_ROOTFS_OVERLAY/POST_BUILD_SCRIPT/DTB (expected; we append overrides).
+    - mke2fs note: 64-bit ext4 feature disabled by design (Buildroot default for small images); harmless.
+    - Missing path during cleanup (usr/libexec) printed by find is benign.
+
+- Next verification: make tardigrade-image; make tardigrade-flash
+
   - After flashing, run `lsblk` to confirm rootfs partition uses full capacity
+
+### Checkpoint: Flash verification (host-side SD card)
+- User report (verbatim):
+  - "The boot of the device was successful, I see the hello message at the end of the boot sequence. I cannot use the keyboard to type any commands like `cat /etc/issue` (likely because there's no keyboard configured on our image), but that's ok for now."
+- Assistant verification (host-side lsblk):
+  - Detected device: sdc MassStorageClass usb RM=1 SIZE=115.9G
+  - Partitions:
+    - sdc1 32M vfat (boot)
+    - sdc2 115.8G ext4 LABEL=rootfs (root filesystem)
+  - Interpretation: Matches expected layout. Rootfs partition expanded to fill device capacity. Expansion successful.
+
 
 
   - Option 1: Minimal userspace with shell (pwd available)

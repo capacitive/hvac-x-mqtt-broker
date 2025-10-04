@@ -34,8 +34,8 @@ help:
 	@echo "  flash                 - Flash $(OUTPUT_IMG) to SD card (interactive device selection)"
 	@echo "  deploy                - OTA deploy to running Pi (PI_HOST=$(PI_HOST))"
 	@echo "  rollback              - OTA rollback to previous version on device"
-	@echo "  tartigrade-image      - Build Buildroot sdcard.img for Step 1 (Hello World)"
-	@echo "  tartigrade-flash      - Flash Buildroot sdcard.img via interactive selector"
+	@echo "  tardigrade-image      - Build Buildroot sdcard.img for Step 1 (Hello World)"
+	@echo "  tardigrade-flash      - Flash Buildroot sdcard.img via interactive selector"
 	@echo "  clean                 - Remove build artifacts"
 
 build:
@@ -85,14 +85,14 @@ rollback:
 clean:
 	rm -rf $(BUILD_DIR) $(OUTPUT_IMG)
 
-.PHONY: tartigrade-image tartigrade-flash
+.PHONY: tardigrade-image tardigrade-flash
 
-tartigrade-image:
-	bash tartigrade/build-image.sh
+tardigrade-image:
+	bash tardigrade/build-image.sh
 
-tartigrade-flash:
+tardigrade-flash:
 	@if [ ! -f ".buildroot/output/images/sdcard.img" ]; then \
-		echo "Buildroot image not found. Run 'make tartigrade-image' first."; \
+		echo "Buildroot image not found. Run 'make tardigrade-image' first."; \
 		exit 1; \
 	fi
 	sudo bash scripts/flash.sh .buildroot/output/images/sdcard.img

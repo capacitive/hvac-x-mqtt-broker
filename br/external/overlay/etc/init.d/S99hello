@@ -1,11 +1,11 @@
 #!/bin/sh
-# Tartigrade Step 1 hello message
+# tardigrade Step 1 hello message
 # Run late in boot; also write to console and motd for visibility
 
-MSG="hello from tartigrade: minimal boot successful"
+MSG="hello from tardigrade: minimal boot successful"
 
 # Try to log to syslog (non-fatal if busybox syslog not present)
-logger -t tartigrade "$MSG" 2>/dev/null || true
+logger -t tardigrade "$MSG" 2>/dev/null || true
 
 # Wait briefly for console to be ready and write directly to tty1
 for i in 1 2 3 4 5; do

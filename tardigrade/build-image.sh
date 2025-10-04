@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Tartigrade Step 1: Buildroot Hello World (Option 3: root-only BusyBox, hello at boot)
+# tardigrade Step 1: Buildroot Hello World (Option 3: root-only BusyBox, hello at boot)
 # This script:
 #  - Fetches Buildroot (pinned release) into .buildroot/
 #  - Applies raspberrypi3 base defconfig and overlays a rootfs with a hello init script
@@ -19,9 +19,9 @@ mkdir -p "$BR_DIR" "$BR_EXT_DIR"
 
 # 1) Fetch Buildroot if missing (pinned tag)
 if git -C "$BR_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "[tartigrade] Buildroot already present at $BR_DIR (git work tree detected)"
+  echo "[tardigrade] Buildroot already present at $BR_DIR (git work tree detected)"
 else
-  echo "[tartigrade] Cloning Buildroot $BR_TAG..."
+  echo "[tardigrade] Cloning Buildroot $BR_TAG..."
   rm -rf "$BR_DIR"
   git clone --depth 1 --branch "$BR_TAG" "$BR_REPO" "$BR_DIR"
 fi
@@ -61,6 +61,6 @@ if [[ ! -f "$IMG_PATH" ]]; then
   exit 1
 fi
 
-echo "[tartigrade] Build complete: $IMG_PATH"
-echo "[tartigrade] Next step: flash with 'make tartigrade-flash' or:\n  sudo bash scripts/flash.sh $IMG_PATH"
+echo "[tardigrade] Build complete: $IMG_PATH"
+echo "[tardigrade] Next step: flash with 'make tardigrade-flash' or:\n  sudo bash scripts/flash.sh $IMG_PATH"
 
