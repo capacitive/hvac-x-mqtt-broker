@@ -44,6 +44,8 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
 - Next verification: Reboot and confirm:
   - Message appears on console (tty1)
   - Message present in `/etc/motd`
+- Result: Build and flash successful (user report).
+
   - If syslog present, `logread | grep tartigrade` shows the entry
 
 ### Flashing: Auto-Expand to Full Device Capacity
@@ -279,7 +281,7 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
   - Device boots to console without wizard
   - Boot log shows our "hello" line
   - Login as root on serial/HDMI console; shell available
-- Status: Pending.
+- Status: Complete.
 
 ### Step 2: Networking Bring-Up (Wi-Fi + Static IP)
 - Objective: Add wpa_supplicant + dhcpcd (or udhcpc) to bring up wlan0 with static IP.

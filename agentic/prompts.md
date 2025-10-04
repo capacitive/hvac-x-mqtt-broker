@@ -41,3 +41,19 @@ Create a small UI Rust app that allows you to start a progress bar and signal it
 
 #### 'tardigrade' rename
 I'm almost certain that 35 occurences of 'tartigrade' in 8 files will NOT take 40 minutes! Rebuilding everything is not necessary as this is a very targeted change. I've also switched to a new branch to contain the blast radius if anything should go wrong.  Simple VSCode find and replace would be a good thing to give you access to.
+
+#### tardigrade optimise
+Let's discuss the best time in this minimal OS creation process (toolchain and minimal linux OS can be jointly referred to as 'tardigrade' from now on) to make it as small as possible.  Here's what you've presented as options:
+
+1. Prefer musl toolchain over glibc in Buildroot (typically shrinks userspace).
+2. Keep BusyBox minimal, remove non-essential applets.
+3. Avoid pulling in heavy packages; strip binaries/libraries (Buildroot’s default does).
+4. Trim locales, docs, and kernel modules not needed (use a minimal defconfig + prune modules).
+5. Optionally consider squashfs for root with an overlay (smaller at rest, read-only base).
+
+Tasks:
+1. Add a size budget to docs/BUILDROOT.md and lock targets per milestone.
+2. Switch to a musl toolchain and regenerate the image to quantify the savings.
+3. Produce a size report script (host-side and on-device) for quick auditing with each build.
+
+I suggest we do these one at a time, on a git branch named augment-deploy-tiny
