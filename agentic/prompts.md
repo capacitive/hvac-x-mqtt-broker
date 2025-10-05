@@ -72,3 +72,6 @@ Size Optimization Phase 2 (after Wi‑Fi bring‑up)
 1. Trim kernel config/modules (drop anything unused by Wi‑Fi/SSH/go app path)
 2. Consider squashfs root + overlay, validating OTA approach
 3. BusyBox applets: keep only what we actually use at runtime/diagnostics
+
+#### isolating changes - last known good
+I'd like you to work on this on a "last known good branch", so I'm switching us back to the `augment-deploy` branch. Then, we can commence work on the remote access.
