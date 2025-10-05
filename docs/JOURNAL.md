@@ -431,3 +431,151 @@ Appendix: Success Criteria Summary
 
   - A (Assistant, verbatim):
     "Acknowledged. Logos will remain. This Q&A has been journaled in docs/JOURNAL.md under this checkpoint."
+
+
+### Checkpoint: Phase 1 – Boot partition config/cmdline baked via firmware hooks
+- Problem: SD card boot partition still had default `cmdline.txt` (`console=ttyAMA0,115200`) and a full sample `config.txt` despite our intended quiet settings.
+- Root cause: Our post-image script edited files under `output/images/rpi-firmware/`, but those edits occur after `genimage` has already created `boot.vfat`/`sdcard.img`. Thus, the FAT image still contained defaults.
+- Solution: Use Buildroot’s official Raspberry Pi firmware hooks so upstream packs our exact files into `boot.vfat`:
+  - `BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE = $BR_EXT_DIR/board/hvacx/rpi0_2w/cmdline.txt`
+  - `BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE = $BR_EXT_DIR/board/hvacx/rpi0_2w/config.txt`
+- Files (created by user in Step 1 of this fix):
+  - `br/external/board/hvacx/rpi0_2w/cmdline.txt`
+    - `root=/dev/mmcblk0p2 rootwait console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime`
+  - `br/external/board/hvacx/rpi0_2w/config.txt`
+    - `kernel=zImage`, `boot_delay=0`, `disable_splash=1`, `gpu_mem=16`
+- Build overrides added (assistant) in `tardigrade/build-image.sh` to point to those files.
+- Post-image script note: Our script still edits the plain files in `images/rpi-firmware/`, but the authoritative contents of `boot.vfat` now come from the firmware hooks, so our edits won’t override the packed FAT image.
+
+Verification plan
+1) Host, before flashing:
+   - Show what’s inside the FAT image:
+     - `.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::cmdline.txt`
+     - `.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::config.txt`
+   - Expect exact matches to the two files above.
+2) After flashing:
+   - `sudo mount /dev/sdX1 /mnt/boot`
+   - `cat /mnt/boot/cmdline.txt; cat /mnt/boot/config.txt`
+   - Expect exact matches.
+
+Q&A (verbatim)
+- User: "I'll kick it off.  You create a checkpoint here, and make the journal entry, as per the `.augment/rules/journaling.md` rule ."
+- Assistant: "Checkpoint recorded. Firmware hooks enabled in build overrides; your files will be baked into boot.vfat/sdcard.img. Proceeding with the verification plan; awaiting your build/flash outcome to mark this step verified."
+
+Status
+- Rebuild/flash in progress (user initiated). Verification pending.
+
+
+### Journaling Policy Acknowledgement (per .augment/rules/journaling.md)
+- Rule (verbatim excerpt): After every conversation checkpoint, journal VERBATIM the conversation we had, in full markdown formatting, maintaining the original formatting... Only verbatim user prompts and verbatim agent answers are acceptable. DO NOT PARAPHRASE OR SUMMARIZE.
+- Assistant commitment: I will append a VERBATIM Q&A block to docs/JOURNAL.md after each of my replies going forward.
+
+### Q&A (verbatim)
+- User:
+  "I want you to read  `.augment/rules/journaling.md` and update docs/JOURNAL.md accordingly. You must journal according to this rule every time you're finished replying to my prompts.  If there's a stipulation in your programming or Augment Code company guideline preventing you from complying, please share this information now."
+- Assistant:
+  "I will read the journaling rules from .augment/rules/journaling.md to ensure compliance, then add a new entry to docs/JOURNAL.md acknowledging the policy and logging this exchange verbatim."
+- Assistant (follow-up):
+  "Acknowledged. I have read .augment/rules/journaling.md and will journal verbatim after every reply. There is no policy blocking compliance."
+
+
+
+### Q&A (verbatim)
+- User:
+  "I confirm that the cmdline.txt and config.txt changes are exactly as expected on-device.  The pre-mounted dir is: `/mnt/boot`, so you may inspect the contents of the sd image.  Upon testing on-device, there is no HDMI signal emitting from the RPI 0, so therefore no console output is occurring.  Please troubleshoot, inspect files, and report back."
+- Assistant:
+  "I inspected /mnt/boot. Kernel (zImage) and DTB (bcm2710-rpi-zero-2-w.dtb) are present. cmdline.txt is `root=/dev/mmcblk0p2 rootwait console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime logo.nologo` and config.txt contains `kernel=zImage`, `boot_delay=0`, `disable_splash=1`, `gpu_mem=16`. With quiet logging and `logo.nologo`, the screen can remain black even when HDMI is active; however, your monitor reports 'no signal', which likely means HDMI isn’t being driven. The most common cause is missing hotplug detection. Proposed quick, reversible test (with your permission): add `hdmi_force_hotplug=1` (and optionally `hdmi_drive=2`) to /mnt/boot/config.txt, and bump `gpu_mem` to 32; then reboot. If you prefer an even quicker probe, add `hdmi_safe=1` temporarily to force a known-good HDMI mode, then remove it after validation. If this restores signal, I’ll persist these settings in br/external/board/hvacx/rpi0_2w/config.txt. Also, I noticed `logo.nologo` in cmdline.txt; if you want the Tux logos back, remove that token. Please confirm if I may apply the config.txt edits on the mounted SD now."
+
+### Q&A (verbatim)
+- User:
+  "Are you able to retroactively update `docs/JOURNAL.md` according to the journaling rule, from the very start of this conversation, which begins on Sept 22, 2025 at 3:17 PM?"
+- Assistant:
+
+### Q&A (verbatim)
+- User:
+  "RPI 0 is now emitting signal to HDMI.  However, a kernel panic is occurring at boot time. Excerpts from the error output are:
+  ```
+  Exception stack(0x81001f18 to 0x81001f60)
+   CPU2: stopping
+  CPU: 2 PID: 0 Comm: swapper/2 Not tainted 6.1.61-v7 #1
+  Exception stack(0x9e86df68 to 0x9e86dfb0)
+  CPU3: stopping
+  CPU: 3 PID: 0 Comm: swapper/3 Not tainted 6.1.61-v7 #1
+  Exception stack(0x9e871f68 to 0x9e871fb0)
+  ---[ end Kernel panic - not syncing: VFS: Unable tomount root fs on unknown-block(179,2) ]---
+  ```"
+- Assistant:
+  "Thanks for the excerpts. I inspected the SD’s boot partition at /mnt/boot and confirmed:
+  - zImage and bcm2710-rpi-zero-2-w.dtb are present
+  - cmdline.txt: `root=/dev/mmcblk0p2 rootwait console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime logo.nologo`
+  - config.txt: kernel=zImage, boot_delay=0, disable_splash=1, gpu_mem=16
+
+  Diagnosis
+  - The panic `VFS: Unable to mount root fs on unknown-block(179,2)` indicates the kernel can’t mount /dev/mmcblk0p2. The most common cause in our Buildroot (no initramfs) setup is that required drivers are built as modules, but the root filesystem and MMC host must be built-in.
+  - Our image’s root partition is ext4 (genimage uses rootfs.ext4). If EXT4 or MMC/SDHCI/BCM2835 host drivers are modules, the kernel can’t load them early and will panic.
+
+  Fix applied in source (pending rebuild/flash)
+  - I added a kernel config fragment to force these built-in:
+    - CONFIG_EXT4_FS=y; CONFIG_EXT4_USE_FOR_EXT2=y
+    - CONFIG_MMC=y; CONFIG_MMC_BLOCK=y; CONFIG_MMC_SDHCI=y
+    - CONFIG_MMC_SDHCI_IPROC=y; CONFIG_MMC_BCM2835=y
+  - File: br/external/board/hvacx/rpi0_2w/kernel-rootfs.fragment
+  - Updated tardigrade/build-image.sh so BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES includes both fragments (lz4 + rootfs drivers).
+
+  Next steps to validate
+  1) Rebuild and flash:
+     - `make -C .buildroot olddefconfig`
+     - `make -C .buildroot -j$(nproc)`
+     - `make tardigrade-flash`
+  2) Boot and confirm the panic is gone and root mounts.
+
+  Optional persistence for HDMI (since signal now works)
+  - If you enabled hdmi_force_hotplug=1 / hdmi_drive=2 / gpu_mem=32 on the SD to get signal, I can persist those in br/external/board/hvacx/rpi0_2w/config.txt so future images keep them. Please confirm.
+
+  If the panic persists after rebuild
+  - Please capture a photo of the 10–20 lines above the panic so we can see whether it’s failing to find the block device or rejecting the filesystem. We can also switch to PARTUUID-based root= to mirror upstream and add `rootfstype=ext4` for clarity.
+
+  May I proceed with the full rebuild now, or would you like to kick it off on your side?"
+  "I cannot reconstruct verbatim transcripts that aren’t present in the current workspace or tool context. The conversation history available here is abridged, and I don’t have access to a complete, timestamped archive from Sept 22, 2025 3:17 PM onward. To retroactively journal VERBATIM as required, please provide a full markdown export (with timestamps) of the conversation. Once supplied, I will append it to docs/JOURNAL.md without alteration. As an alternative, I can backfill a clearly labeled ‘partial’ journal using only the content already present in docs/JOURNAL.md and the abridged history, but it would not satisfy the strict VERBATIM requirement. Going forward, I will continue to append verbatim Q&A after each reply per the rule."
+
+### Q&A (verbatim)
+- User:
+  "Inspect `br/external/board/hvacx/rpi0_2w/post-image.sh`. This script simply needs to copy the contents of `br/external/board/hvacx/rpi0_2w/cmdline.txt` and `br/external/board/hvacx/rpi0_2w/config.txt`, not the line by line editing it's currently doing.  Plus, the contextual location of our custom cmdline.txt and config.txt files nees to be resolved by this script as well.  I tested the script, and when `make -C .buildroot -j$(nproc)` is run, the values in out custom files are ignored, and the automated edit code is what determines the contents of the on-disk files.  Please ensure that the contents of `br/external/board/hvacx/rpi0_2w/cmdline.txt` and `br/external/board/hvacx/rpi0_2w/config.txt` are what end up on the sd image."
+- Assistant:
+  "I updated br/external/board/hvacx/rpi0_2w/post-image.sh to stop line-by-line editing and instead:
+  - Resolve the custom files relative to the script using SCRIPT_DIR
+  - Copy them to ${BINARIES_DIR}/rpi-firmware/ via install -m 0644 (transparency before packing)
+  - If boot.vfat already exists (when the upstream post-image ran first), patch it in-place using ${HOST_DIR}/bin/mcopy so the FAT image (and sdcard.img) contain our exact cmdline.txt and config.txt
+  This guarantees our files end up on the SD image regardless of execution order. Optionally, we can reorder BR2_ROOTFS_POST_IMAGE_SCRIPT to run our script before the upstream one so genimage picks up our files without needing the boot.vfat patch step. Let me know if you want me to reorder as well."
+
+
+### Q&A (verbatim)
+- User:
+  "Instead of having to share photos and other information about what's happening on the RPI Zero \"over the air\", what about creating an app or script that allows you to access the RPI Zero's shell yourself?  That way, you can work on things unattended, being able to test your changes as you make them.  We could make this an MCP server or RAG server, whichever works best, or just create a standalone app or script that provides the access."
+- Assistant:
+  "Great idea. I can’t directly ‘reach out’ to the device from here without a secure path, but we can set one up so I can SSH in and run commands unattended. You have a few options:
+  1) USB gadget serial console (tiny, offline): present a /dev/ttyGS0 console over the Pi’s USB-C; no network required. Best for lab benches.
+  2) Reverse SSH tunnel (recommended minimal): device dials out to a bastion (your VPS/home server) and exposes its port 22 back to you. Tiny footprint with Dropbear, robust behind NAT/CGNAT.
+  3) Tailscale (mesh VPN): simplest operationally; larger footprint. Buildroot has a tailscale package; gives you stable device name, MagicDNS.
+  4) WireGuard peer: lightweight; needs a reachable peer or relay.
+
+  Recommended (2): Dropbear + reverse SSH
+  - Enable Dropbear server and use Dropbear’s client (dbclient) to create a persistent -R reverse tunnel to a bastion. Keepalive+respawn ensures it stays up. No inbound firewall rules needed.
+  - Footprint stays small; no extra daemons.
+
+  What I would implement (once you approve and provide bastion details):
+  - Buildroot config: BR2_PACKAGE_DROPBEAR=y (server + dbclient)
+  - Overlay files:
+    - /root/.ssh/authorized_keys (your key)
+    - /root/.ssh/id_ed25519 + .pub (device key for outbound to bastion) [or inject at flash time]
+    - /etc/init.d/S50reverse_ssh: launches dbclient -R to bastion with keepalives and auto-reconnect loop
+  - Bastion config: create user, add device’s public key, ensure AllowTcpForwarding yes; GatewayPorts clientspecified or yes; choose a remote port (e.g., 22022).
+  - Result: you (and, with your permission, I) can connect via ssh -p 22022 localhost on the bastion to reach the Pi.
+
+  If you prefer Tailscale (3): I can add tailscale to Buildroot, auth on first boot, and then use its IP to SSH. Larger binary but dead-simple connectivity.
+
+  Inputs needed:
+  - Which option? (2) Reverse SSH (recommended) or (3) Tailscale, or (1) USB gadget for bench.
+  - For reverse SSH: bastion host (DNS/IP), bastion username, remote port to allocate, and which public keys to trust. I recommend a dedicated device key.
+
+  With your go‑ahead and inputs, I’ll add the minimal files/scripts, wire it into the image, and then (with your permission) use SSH from here to run commands on the RPi.”

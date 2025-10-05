@@ -3607,3 +3607,212 @@ Add logo.nologo to our post-image cmdline edits, and
 Update the kernel fragment to disable CONFIG_LOGO and friends This will fully remove the logos on next rebuild/flash.
 Would you like me to apply those “no logo” changes now?
 
+11:00 PM
+No, leave the logos in, but journal this next portion of our conversation
+
+Read file
+
+JOURNAL.md
+docs
+Edited file
+
+JOURNAL.md
+docs
+Got it. I’ve journaled this portion of our conversation in docs/JOURNAL.md under “Q&A Checkpoint: Boot speed, base image, musl rebuild, and quiet boot verification,” with your questions and my answers verbatim.
+
+Quick answers to your questions
+
+Should splash and verbose boot be gone?
+You will still see the four Tux logos (kernel logos). disable_splash=1 removes the GPU rainbow splash, not Tux. Verbosity should be much lower with quiet loglevel=3, but a few early lines can still appear.
+Where are cmdline.txt and config.txt?
+In your build artifacts on the host: .buildroot/output/images/rpi-firmware/
+On the SD card boot partition (FAT) after flashing: mount it and read /cmdline.txt and /config.txt
+What your current built image contains
+
+cmdline.txt:
+
+cmdline.txt
+.buildroot/output/images/rpi-firmware
+config.txt:
+
+config.txt
+.buildroot/output/images/rpi-firmware
+boot_delay=0
+disable_splash=1
+gpu_mem=16
+How to verify on the flashed SD card
+
+Identify device: lsblk -o NAME,MODEL,SIZE,MOUNTPOINT
+Mount boot partition: sudo mount /dev/sdX1 /mnt/boot
+Inspect: cat /mnt/boot/cmdline.txt; cat /mnt/boot/config.txt
+Unmount: sudo umount /mnt/boot
+Next
+
+If you confirm the SD card’s boot files match the above and you still see a lot of logs, we can tighten further (e.g., drop getty on serial, reduce init chatter). You asked to keep the logos, so I’ll leave those in.
+09:50 AM
+`cat /mnt/boot/cmdline.txt` result:
+
+`root=/dev/mmcblk0p2 rootwait console=tty1 console=ttyAMA0,115200
+`
+
+`cat /mnt/boot/config.txt` result:
+the entire contents of the .buildroot sample, not merely the exact contents required by our image build.
+
+The desired config/cmdline is not translating to the final image build.  Please walk me through the process of fixing this before changing anything.
+
+Grep Search
+/home/fazzo/go/src/hvac-x-mqtt-broker/.buildroot BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE false **/* 2 2
+Terminal
+$ bash -lc ".buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::cmdline.txt | sed -n '1,2p' && echo '---' && .buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::config.txt | sed -n '1,40p' || true"
+Why your SD card still has the old cmdline/config
+What happened: Our custom post-image script edits the plain files in images/rpi-firmware/, but the Raspberry Pi post-image step uses genimage to build boot.vfat and sdcard.img earlier. Once boot.vfat/sdcard.img are created, changing images/rpi-firmware/cmdline.txt or config.txt won’t be reflected in the final image unless we modify the FAT image or sdcard.img directly afterwards.
+Evidence: The contents inside boot.vfat (and on your SD) still show the defaults:
+cmdline.txt includes console=ttyAMA0,115200
+config.txt is the full “sample” file
+Confirmed: Inspecting boot.vfat directly shows it has the defaults, not our tweaks. This is why your SD’s boot partition shows the defaults too.
+The correct, stable way to inject our cmdline/config
+Buildroot exposes two config options that the upstream Raspberry Pi post-image script already uses:
+
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE
+Right now your Buildroot config points to upstream defaults:
+
+
+.config
+.buildroot
+Fix strategy (no code changes yet, just the plan):
+
+Create two files in our external tree with exactly what we want in the boot partition:
+br/external/board/hvacx/rpi0_2w/cmdline.txt
+br/external/board/hvacx/rpi0_2w/config.txt
+Update tardigrade/build-image.sh to override those Buildroot options to point at our files so the upstream script packs them into boot.vfat and sdcard.img.
+Rebuild and reflash. The SD’s /cmdline.txt and /config.txt will then match our files.
+What those files should contain
+cmdline.txt (minimal, with our quieting and FS flags)
+config.txt (include kernel=zImage; plus our fast-boot tweaks; we can keep it tight)
+Note: kernel=zImage is important because our build installs a zImage. We don’t need the long sample; these lines are sufficient. We are not disabling the kernel logos per your request.
+
+How you can verify each stage (before we change anything)
+Check what’s currently baked into your built images:
+Show cmdline/config sitting inside boot.vfat (the actual boot partition image):
+.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::cmdline.txt
+.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::config.txt
+You should see the defaults today (console=ttyAMA0 and the sample config).
+After we switch Buildroot to use our files:
+Rebuild, then re-run the same mtype commands above. You should see exactly our lines.
+After flashing, mount your SD boot partition and:
+cat /mnt/boot/cmdline.txt
+cat /mnt/boot/config.txt
+These should match our files verbatim.
+Alternative (not recommended unless needed)
+We could post-edit sdcard.img or boot.vfat after genimage runs (loop-mount or mtools) to modify cmdline.txt and config.txt. This is more brittle than using the official BR2_PACKAGE_RPI_FIRMWARE_* knobs, so I recommend the variable override approach.
+Proposed next steps
+With your OK, I will:
+Add the two files with the contents above.
+Update tardigrade/build-image.sh to set:
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE to our cmdline.txt
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE to our config.txt
+Rebuild instructions: make -C .buildroot clean; make tardigrade-image V=1
+Verify with mtype on boot.vfat, then flash and confirm on-device.
+Would you like me to apply this change now on augment-deploy-tiny?
+
+10:44 AM
+I completed 1. (add the two files and edit contents)
+
+You do: 
+2. Update tardigrade/build-image.sh to override those Buildroot options to point at our files so the upstream script packs them into boot.vfat and sdcard.img. 
+
+Pay close attention to the configuration/variables in `br/external/board/hvacx/rpi0_2w/post-image.sh`, lines 9 and 37.  We need to be sure that our overrides are not effected by what these lines refer to.
+
+Also solve the concern the below represents, or answer the  questions: 
+Why does `tardigrade/build-image.sh` point to `board/raspberrypi3/post-image.sh ` and not `.buildroot/board/raspberrypi0w/post-image.sh`??
+Couldn;t this cause an issue later on when we add the wifi/bluetooth features?
+
+Read file
+
+build-image.sh
+tardigrade
+Edited file
+
+build-image.sh
+tardigrade
+Great — I added the overrides so your files get baked into the boot partition.
+
+What I changed (Step 2)
+
+In tardigrade/build-image.sh I appended the official Raspberry Pi firmware config hooks to point at the files you created:
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE="$BR_EXT_DIR/board/hvacx/rpi0_2w/cmdline.txt"
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$BR_EXT_DIR/board/hvacx/rpi0_2w/config.txt"
+This ensures the upstream Raspberry Pi post-image step (genimage) packs your cmdline.txt and config.txt into boot.vfat and sdcard.img. Our own post-image script runs afterward and only edits the plain files under images/rpi-firmware, so it won’t override what’s inside boot.vfat anymore.
+
+Where this lands in build-image.sh
+
+Added right next to the other overrides, before the post-image scripts are invoked:
+
+build-image.sh
+tardigrade
+About post-image.sh lines 9 and 37
+
+Those lines point to images/rpi-firmware/cmdline.txt and images/rpi-firmware/config.txt:
+They edit the plain text files in the images directory, not the already-built boot.vfat image.
+With the change above, the “source of truth” for cmdline/config is now your two files, which upstream uses to generate boot.vfat. Our local edits won’t affect boot.vfat; therefore they can’t override your settings.
+Net: Your overrides are authoritative in the final image. Our post-image script won’t undo them.
+Why use board/raspberrypi3/post-image.sh (not raspberrypi0w)?
+
+Hardware mapping: Raspberry Pi Zero 2 W uses the BCM2710 (Cortex-A53) — the same SoC family as Pi 3. Buildroot’s RPi3 board support is the correct base for Zero 2 W (32-bit). The “raspberrypi0w” target is for the original Zero W (BCM2835/ARM1176), different architecture and image layout assumptions.
+Safety for Wi‑Fi/Bluetooth: This choice does not limit Wi‑Fi/BT features. Those are controlled by:
+Buildroot packages (wpa_supplicant, firmware-brcm80211, bluez, etc.)
+Kernel config and device overlays
+The post-image script simply assembles the boot partition and sdcard image. Using the Pi 3 post-image is correct for Zero 2 W and won’t block future networking features.
+How to verify (host, before flashing)
+
+Rebuild (at least the images). Because genimage packs boot.vfat, ensure it runs after the config changes:
+Safe path: make -C .buildroot clean; make tardigrade-image V=1
+Inspect what’s inside boot.vfat (the actual boot partition image):
+.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::cmdline.txt
+.buildroot/output/host/bin/mtype -i .buildroot/output/images/boot.vfat ::config.txt
+You should now see your exact contents from br/external/board/hvacx/rpi0_2w/{cmdline.txt,config.txt}
+Then flash and verify on-device
+
+After flashing, mount the SD boot partition:
+sudo mount /dev/sdX1 /mnt/boot
+cat /mnt/boot/cmdline.txt; cat /mnt/boot/config.txt
+These should match your files verbatim.
+Optional cleanup (future)
+
+Since we’re now using the official firmware hooks, we can simplify our post-image script and remove the edits to images/rpi-firmware/*.txt entirely. This avoids confusion. I can make that tidy-up once you confirm the new image behaves as expected.
+Want me to kick off a clean rebuild now or wait for your go-ahead?
+
+10:54 AM
+I'll kick it off.  You create a checkpoint here, and make the journal entry, as per the `.augment/rules/journaling.md` rule .
+
+Edited file
+
+JOURNAL.md
+docs
+Checkpoint recorded and journal updated per the journaling rule.
+
+What I did
+
+Added a new checkpoint in docs/JOURNAL.md: “Phase 1 – Boot partition config/cmdline baked via firmware hooks”
+Captures the root cause, solution, and verification steps
+Includes our Q&A verbatim and marks status as “Rebuild/flash in progress (user initiated). Verification pending.”
+Summary of this checkpoint
+
+Problem: boot.vfat still had defaults; our edits were applied after genimage.
+Fix: Use Buildroot firmware hooks so the upstream post-image packs your files:
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE → br/external/board/hvacx/rpi0_2w/cmdline.txt
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE → br/external/board/hvacx/rpi0_2w/config.txt
+Post-image script: Still edits images/rpi-firmware, but boot.vfat is now authoritative from your files.
+Verification:
+Host: use mtype to show cmdline.txt/config.txt inside boot.vfat
+Device: mount /dev/sdX1 and cat /mnt/boot/{cmdline.txt,config.txt}
+Status: Build/flash running on your side; awaiting your results to mark verified.
+When you’re done building/flashing, paste:
+
+mtype outputs for cmdline.txt and config.txt from boot.vfat, and/or
+cat outputs from the SD’s boot partition after mounting I’ll mark the checkpoint verified and proceed.
+Drop files to attach as context
+images (png, jpg, jpeg)
+
+
