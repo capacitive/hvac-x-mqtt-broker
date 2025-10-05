@@ -37,6 +37,7 @@ help:
 	@echo "  tardigrade-image      - Build Buildroot sdcard.img for Step 1 (Hello World)"
 	@echo "  tardigrade-flash      - Flash Buildroot sdcard.img via interactive selector"
 	@echo "  clean                 - Remove build artifacts"
+	@echo "  size                  - check image size after tardigrade-image"
 
 build:
 	go build -o $(BUILD_DIR)/$(APP_NAME) ./
@@ -85,7 +86,7 @@ rollback:
 clean:
 	rm -rf $(BUILD_DIR) $(OUTPUT_IMG)
 
-.PHONY: tardigrade-image tardigrade-flash
+.PHONY: tardigrade-image tardigrade-flash size
 
 tardigrade-image:
 	bash tardigrade/build-image.sh
@@ -97,4 +98,6 @@ tardigrade-flash:
 	fi
 	sudo bash scripts/flash.sh .buildroot/output/images/sdcard.img
 
+size:
+	bash scripts/size-report.sh
 

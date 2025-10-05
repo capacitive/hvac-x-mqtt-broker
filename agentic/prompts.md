@@ -57,3 +57,18 @@ Tasks:
 3. Produce a size report script (host-side and on-device) for quick auditing with each build.
 
 I suggest we do these one at a time, on a git branch named augment-deploy-tiny
+
+
+#### wifi/bt integration with firmware
+No, leave the logos in, but journal this, and let's get on with Step 2 (wifi and bluetooth) and optimization phase 2: 
+
+### Step 2: Networking Bring-Up (Wi-Fi + Static IP)
+- Objective: Add wpa_supplicant + dhcpcd (or udhcpc) to bring up wlan0 with static IP.
+- Verification:
+  - `ip addr` shows wlan0 with configured address
+  - Host can ping device
+
+Size Optimization Phase 2 (after Wi‑Fi bring‑up)
+1. Trim kernel config/modules (drop anything unused by Wi‑Fi/SSH/go app path)
+2. Consider squashfs root + overlay, validating OTA approach
+3. BusyBox applets: keep only what we actually use at runtime/diagnostics

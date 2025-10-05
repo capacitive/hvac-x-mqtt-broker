@@ -2,9 +2,16 @@
 # tardigrade Step 1 hello message
 # Run late in boot; also write to console and motd for visibility
 
+# Print a terse banner with kernel and image version before the hello
+VER="$(cat /etc/tardigrade-version 2>/dev/null || echo 'v0.0.0')"
+KREL="$(uname -r)"
+OSV="$(. /etc/os-release 2>/dev/null; echo "$PRETTY_NAME")"
+BANNER="Linux $KREL | tardigrade image $VER | ${OSV:-Buildroot}"
+
 MSG="hello from tardigrade: minimal boot successful"
 
 # Try to log to syslog (non-fatal if busybox syslog not present)
+logger -t tardigrade "$BANNER" 2>/dev/null || true
 logger -t tardigrade "$MSG" 2>/dev/null || true
 
 # Wait briefly for console to be ready and write directly to tty1
@@ -12,10 +19,16 @@ for i in 1 2 3 4 5; do
     [ -e /dev/tty1 ] && break
     sleep 1
 done
-[ -e /dev/tty1 ] && echo "$MSG" > /dev/tty1 || true
+if [ -e /dev/tty1 ]; then
+  echo "$BANNER" > /dev/tty1
+  echo "$MSG" > /dev/tty1
+fi
 
 # Append to motd so it's visible on login
-( echo "$MSG" >> /etc/motd ) 2>/dev/null || true
+{
+  echo "$BANNER"
+  echo "$MSG"
+} >> /etc/motd 2>/dev/null || true
 
 exit 0
 

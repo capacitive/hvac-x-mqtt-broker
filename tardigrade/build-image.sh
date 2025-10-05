@@ -46,6 +46,15 @@ make -C "$BR_DIR" raspberrypi3_defconfig
   echo "BR2_ROOTFS_OVERLAY=\"$BR_EXT_DIR/overlay\""
   echo "BR2_ROOTFS_POST_BUILD_SCRIPT=\"$BR_EXT_DIR/board/hvacx/rpi0_2w/post-build.sh\""
   echo "BR2_LINUX_KERNEL_INTREE_DTS_NAME=\"bcm2710-rpi-zero-2-w\""
+  # Switch to musl toolchain for smaller userspace
+  echo "BR2_TOOLCHAIN_BUILDROOT=y"
+  echo "BR2_TOOLCHAIN_BUILDROOT_MUSL=y"
+  # Kernel: use LZ4 compression (faster decompress)
+  echo "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES=\"$BR_EXT_DIR/board/hvacx/rpi0_2w/kernel-lz4.fragment\""
+  # Ensure host lz4 tool present if needed by build
+  echo "BR2_PACKAGE_HOST_LZ4=y"
+  # Keep upstream RPi post-image, plus our quiet-boot customization
+  echo "BR2_ROOTFS_POST_IMAGE_SCRIPT=\"board/raspberrypi3/post-image.sh $BR_EXT_DIR/board/hvacx/rpi0_2w/post-image.sh\""
 } >> "$BR_DIR/.config"
 
 make -C "$BR_DIR" olddefconfig

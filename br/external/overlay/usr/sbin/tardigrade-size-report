@@ -1,0 +1,12 @@
+#!/bin/sh
+# On-device size report helper (tiny)
+
+printf "tardigrade size report (device)\n"
+/bin/df -h /
+# Show largest dirs (top 15)
+if command -v du >/dev/null 2>&1; then
+  echo ""
+  echo "Top directories under / (largest first):"
+  du -x -h -d1 / 2>/dev/null | sort -h | tail -n 15
+fi
+

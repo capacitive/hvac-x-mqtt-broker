@@ -85,6 +85,30 @@ Principle: We proceed in lock step. Each step has a clear objective, procedure, 
 
   - After flashing, run `lsblk` to confirm rootfs partition uses full capacity
 
+### Checkpoint: Phase 1 (augment-deploy-tiny) initialized
+- Branch: augment-deploy-tiny
+- Changes staged (no commit yet):
+  - Toolchain: switch to musl via build overrides (BR2_TOOLCHAIN_BUILDROOT + BR2_TOOLCHAIN_BUILDROOT_MUSL)
+  - Quiet boot: custom post-image script to remove serial console, add console=tty1, quiet, loglevel=3
+  - Boot banner: S99hello prints "Linux <kernel> | tardigrade image <VER> | <OS>" before hello
+  - Version embed: post-build writes /etc/tardigrade-version from repo VERSION (defaults v0.1.0 if absent)
+  - Size reporting: scripts/size-report.sh (host) and /usr/sbin/tardigrade-size-report (device)
+- Next actions:
+  - Build locally (make tardigrade-image) and verify boot banner + quiet kernel
+  - Flash and confirm hello still appears and device boots cleanly
+
+### Checkpoint: Phase 1 tuning (kernel LZ4 + firmware tweaks)
+- Kernel compression: enabled LZ4 via config fragment (faster decompress on Cortex-A53)
+- Post-image tweaks:
+  - cmdline.txt: add console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime; remove serial console
+  - config.txt: set boot_delay=0, disable_splash=1, gpu_mem=16
+- Buildroot overrides appended in tardigrade/build-image.sh:
+  - BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES -> board/hvacx/rpi0_2w/kernel-lz4.fragment
+  - BR2_PACKAGE_HOST_LZ4=y (ensure host lz4 available)
+- Next: Rebuild (make tardigrade-image), flash, verify faster/cleaner boot and banner
+
+
+
 ### Checkpoint: Flash verification (host-side SD card)
 - User report (verbatim):
   - "The boot of the device was successful, I see the hello message at the end of the boot sequence. I cannot use the keyboard to type any commands like `cat /etc/issue` (likely because there's no keyboard configured on our image), but that's ok for now."
@@ -352,3 +376,58 @@ Appendix: Success Criteria Summary
 - Minimal footprint; add only what is necessary.
 - Every step is validated on real hardware.
 
+
+
+### Q&A Checkpoint: Boot speed, base image, musl rebuild, and quiet boot verification
+- Q (User, verbatim):
+  "Is it possible to use a different base image for the RPI Zero 2?  one that is super fast?  It could be the slow sd card I'm flashing onto that's to blame for the slow boot time, but I'm wondering what other factors are at play that contribute to the slow boot time.  Is it just that a RPI Zero is a slower performing device?"
+
+  - A (Assistant, verbatim):
+    "Short answer
+    - A “different base image” won’t make the Pi Zero 2 W dramatically faster to boot than a tuned Buildroot image. Buildroot is already the leanest path; speed comes from tuning firmware, kernel, filesystem, services, and your SD card.
+    - The SD card is often the biggest factor (especially random read IOPS). The Zero 2 W hardware is modest; with the right tweaks it boots snappily, but won’t match a Pi 4.
+
+    What most affects boot time on a Zero 2 W
+    - SD card performance (A1/A2 class for random I/O)
+    - Firmware/bootloader stage (config.txt: boot_delay, features)
+    - Kernel decompression and init (prefer LZ4; avoid extra boot stages)
+    - Filesystem mount options (noatime,nodiratime)
+    - Userspace/services (keep minimal; quiet console)
+
+    Proposed, low‑risk speedups now
+    - config.txt: boot_delay=0, disable_splash=1, gpu_mem=16
+    - cmdline.txt: quiet loglevel=3, rootflags=noatime,nodiratime (we’ll add)
+    - Kernel: switch to LZ4 compression
+
+    Recommendation: Keep Buildroot; biggest wins are SD card quality + above tweaks."
+
+- Q (User, verbatim):
+  "Yes, please - do both of those"
+
+  - A (Assistant, verbatim):
+    "Done. Implemented both items on augment-deploy-tiny.
+    - Kernel compression → LZ4 via fragment; ensured host lz4
+    - Post-image tweaks: cmdline.txt (console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime); config.txt (boot_delay=0, disable_splash=1, gpu_mem=16)
+    - Journal updated; rebuild/flash to take effect."
+
+- Q (User, verbatim):
+  "here's the output of `make tardigrade-image V=1`: … No C compiler?  IS this the issue since we switched to musl for the image builder?"
+
+  - A (Assistant, verbatim):
+    "Diagnosis: Not missing host compiler; Buildroot expects arm-buildroot-linux-musleabihf-* but your host/bin still has arm-buildroot-linux-gnueabihf-* from the previous glibc toolchain. Switching libc requires rebuilding the toolchain.
+    Fix: run a clean + rebuild so the musl toolchain is generated (e.g., `make -C .buildroot clean && make tardigrade-image V=1`)."
+
+- Q (User, verbatim):
+  "I still see the splash (4 raspberry pi logs) and the many lines of verbose bootup messages. Should I be expecting those both to be gone from the bootup sequence?  how can I check if the cmdline.txt and config.txt tweaks were made? I'd like to be able to see those txt file's contents. but I can't lcoate them in the project directory structure."
+
+  - A (Assistant, verbatim):
+    "The four logos are kernel Tux logos (not the GPU splash); disable_splash removes the rainbow splash only. Quiet/loglevel=3 reduces but doesn’t eliminate the earliest lines. To verify files:
+    - Host build artifacts: .buildroot/output/images/rpi-firmware/cmdline.txt and config.txt
+    - On SD card: mount the boot partition (FAT) and view /cmdline.txt, /config.txt
+    Current built values show: cmdline.txt → `root=/dev/mmcblk0p2 rootwait console=tty1 quiet loglevel=3 rootflags=noatime,nodiratime`; config.txt → boot_delay=0, disable_splash=1, gpu_mem=16."
+
+- Q (User, verbatim):
+  "No, leave the logos in, but journal this next portion of our conversation"
+
+  - A (Assistant, verbatim):
+    "Acknowledged. Logos will remain. This Q&A has been journaled in docs/JOURNAL.md under this checkpoint."
