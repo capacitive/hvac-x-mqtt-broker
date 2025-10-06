@@ -1,0 +1,6 @@
+kernel=zImage
+boot_delay=0
+disable_splash=1
+hdmi_force_hotplug=1
+hdmi_drive=2
+gpu_mem=32
