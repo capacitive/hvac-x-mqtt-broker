@@ -4,3 +4,6 @@
 [submodule "agentics"]
 	path = agentics
 	url = https://github.com/capacitive/agentics.git
+[submodule ".augment"]
+	path = .augment
+	url = https://github.com/capacitive/.augment.git
