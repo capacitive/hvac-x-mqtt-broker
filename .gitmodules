@@ -1,0 +1,3 @@
+[submodule "rpi-zero-minimal-buildroot"]
+	path = rpi-zero-minimal-buildroot
+	url = https://github.com/capacitive/rpi-zero-minimal-buildroot.git
