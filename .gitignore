@@ -1,4 +1,4 @@
 mqtt-broker
 
 # rpi 0 min buildroot
-# rpi-zero-minimal-buildroot/
+rpi-zero-minimal-buildroot/
