@@ -1,0 +1,3 @@
+[submodule "rpizero/buildroot"]
+	path = rpizero/buildroot
+	url = https://gitlab.com/buildroot.org/buildroot.git
